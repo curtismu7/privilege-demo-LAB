@@ -1,4 +1,6 @@
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import request from 'supertest';
@@ -165,8 +167,15 @@ describe('no raw tokens anywhere (sentinels)', () => {
 
 describe('startup refusals', () => {
   const base = { nodeEnv: '', idp: 'local-mock', mockSignin: true, host: '127.0.0.1', pfUrl: '', pfAudience: '', pfIssuer: '', pfJwksUrl: '' };
-  it('production with the mock IdP', () => expect(startupProblems({ ...base, nodeEnv: 'production' })[0]).toMatch(/NODE_ENV=production/));
-  it('mock sign-in on a non-loopback listener', () => expect(startupProblems({ ...base, host: '0.0.0.0' })[0]).toMatch(/loopback/));
+  it('NODE_ENV=production is not a startup problem by itself', () => expect(startupProblems({ ...base, nodeEnv: 'production' })).toEqual([]));
+  it('mock sign-in on a non-loopback listener, unless compose publishes on loopback only', () => {
+    expect(startupProblems({ ...base, host: '0.0.0.0' })[0]).toMatch(/loopback/);
+    expect(startupProblems({ ...base, host: '0.0.0.0', publish: 'loopback' })).toEqual([]);
+  });
+  it('a bad DEMO_MODE or LAB_ALLOWED_HOSTS stops startup', () => {
+    expect(startupProblems({ ...base, modeRaw: 'both' }).join()).toMatch(/DEMO_MODE/);
+    expect(startupProblems({ ...base, allowedHosts: ['bad host'] }).join()).toMatch(/LAB_ALLOWED_HOSTS/);
+  });
   it('pf without PF_URL / PF_AUDIENCE, and with a plain-http remote', () => {
     expect(startupProblems({ ...base, idp: 'pf', mockSignin: false }).join()).toMatch(/PF_URL.*PF_AUDIENCE/);
     expect(startupProblems({ ...base, idp: 'pf', mockSignin: false, pfUrl: 'http://pf.example', pfIssuer: 'http://pf.example', pfJwksUrl: 'http://pf.example/pf/JWKS', pfAudience: 'a' }).join()).toMatch(/https/);
@@ -181,13 +190,14 @@ describe('startup refusals', () => {
   });
   const entry = fileURLToPath(new URL('../../src/index.js', import.meta.url));
   const run = (env) => spawnSync(process.execPath, [entry], { env: { PATH: process.env.PATH, ...env }, encoding: 'utf8', timeout: 15000 });
-  it('the process exits 1 under NODE_ENV=production with the mock IdP (spawned)', () => {
-    const r = run({ NODE_ENV: 'production', IDP: 'local-mock', ALLOW_MOCK_SIGNIN: '1', DATA_DIR: fs.mkdtempSync('/tmp/pd-x-') });
+  it('the process exits 1 for an unknown DEMO_MODE (spawned)', () => {
+    const r = run({ DEMO_MODE: 'both', STANDALONE_ENV: '/nonexistent/none.env', DATA_DIR: fs.mkdtempSync(path.join(os.tmpdir(), 'pd-x-')) });
     expect(r.status).toBe(1);
     expect(r.stderr).toMatch(/refusing to start/);
   });
-  it('the process exits 1 for mock sign-in on 0.0.0.0 and for pf without settings (spawned)', () => {
-    expect(run({ IDP: 'local-mock', ALLOW_MOCK_SIGNIN: '1', HOST: '0.0.0.0' }).status).toBe(1);
-    expect(run({ IDP: 'pf', NODE_ENV: 'production' }).status).toBe(1);
+  it('the process exits 1 for mock sign-in on 0.0.0.0 and for live mode without settings (spawned)', () => {
+    const base = { STANDALONE_ENV: '/nonexistent/none.env', DATA_DIR: fs.mkdtempSync(path.join(os.tmpdir(), 'pd-x-')) };
+    expect(run({ ...base, ALLOW_MOCK_SIGNIN: '1', HOST: '0.0.0.0' }).status).toBe(1);
+    expect(run({ ...base, DEMO_MODE: 'live', NODE_ENV: 'production' }).status).toBe(1);
   });
 });

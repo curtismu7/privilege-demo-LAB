@@ -1,0 +1,31 @@
+/* Diagram view. Tokens only: the boxes use the shared diagram-box tokens, which are dark in both themes. */
+.diagram { margin: 12px 0; min-width: 0; }
+.diagram__title { margin-bottom: 2px; }
+.diagram__toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+.diagram__canvas { height: 460px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+.diagram__now { margin: 6px 0; background: var(--surface-2); border-left: 4px solid var(--accent); padding: 6px 10px; }
+.inline-field { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
+
+.dg-node { padding: 8px 12px; border-radius: 8px; max-width: 240px; font-size: 13px; display: flex; flex-direction: column; gap: 2px; border: 2px solid var(--border); background: var(--box-grey); color: var(--on-box); }
+.dg-node span { font-size: 12px; overflow-wrap: anywhere; }
+.dg-node--dark { background: var(--box-dark); }
+.dg-node--red { background: var(--box-red); }
+.dg-node--blue { background: var(--box-blue); }
+.dg-node--grey { background: var(--box-grey); }
+.dg-node--green { background: var(--box-dark); border-color: var(--status-ok); border-width: 3px; }
+.dg-node--amber { background: var(--box-dark); border-color: var(--status-warn); border-width: 3px; }
+.handle-back { opacity: 0; pointer-events: none; top: 70%; }
+
+.react-flow { --xy-edge-stroke: var(--muted); --xy-background-color: var(--surface); --xy-edge-label-color: var(--text); --xy-edge-label-background-color: var(--surface); }
+.react-flow__edge-textbg { fill: var(--surface); }
+.react-flow__edge-text { fill: var(--text); font-size: 11px; }
+.react-flow__edge.edge-on .react-flow__edge-path { stroke: var(--accent); stroke-width: 3; }
+.react-flow__edge.edge-dim { opacity: 0.35; }
+.react-flow__edge.edge-dashed .react-flow__edge-path { stroke-dasharray: 6 4; }
+.react-flow__controls-button { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+.react-flow__controls-button svg { fill: var(--text); }
+.react-flow__node:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+@media (max-width: 600px) {
+  .diagram__canvas { height: 360px; }
+}

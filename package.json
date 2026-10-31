@@ -1,6 +1,6 @@
 {
   "name": "privilege-demo-lab",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "description": "Privilege demo LAB: MCP tool calls pass through a policy enforcement point that decides with Cedar",
@@ -10,18 +10,21 @@
     "web"
   ],
   "engines": {
-    "node": ">=20"
+    "node": ">=26"
   },
   "scripts": {
     "dev": "npm run dev -w server & npm run dev -w web",
-    "start": "npm start -w server",
+    "start": "node scripts/start.mjs",
     "test": "npm test -w server && npm test -w web",
     "build": "npm run build -w web",
     "doctor": "node scripts/doctor.mjs",
     "prepare": "git config core.hooksPath .githooks || true",
     "e2e": "node scripts/e2e.mjs",
     "smoke": "node scripts/smoke.mjs",
-    "e2e:utility": "node scripts/e2e-utility.mjs"
+    "e2e:utility": "node scripts/e2e-utility.mjs",
+    "reset": "node scripts/reset.mjs",
+    "check:ui": "bash scripts/check-ui-standard.sh",
+    "check:diagrams": "node scripts/check-diagrams.mjs"
   },
   "devDependencies": {
     "playwright": "1.58.2"

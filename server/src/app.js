@@ -1,16 +1,21 @@
 // Pattern from id-jag-standalone server/src/app.js: createApp() for tests, serves web/dist.
-// createApp({ cfg, now, jwks }) : cfg defaults to config(); now() is the injectable clock (approval expiry, sessions, trace).
+// createApp({ cfg, now, fetchImpl, customerFile }) : cfg defaults to config(); now() is the injectable clock (approval expiry, sessions, trace);
+// fetchImpl is the real fetch behind the netguard (tests pass a stub that must never be called in mock mode).
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
-import { config } from './config.js';
+import { config, liveProblems } from './config.js';
 import { init } from './cedar/index.js';
-import { mockRequestRefusal, adminSwitchPresent } from './auth/guards.js';
+import { mockRequestRefusal, localRequestRefusal, hostAllowed, adminSwitchPresent } from './auth/guards.js';
 import { isAdmin } from './auth/personas.js';
 import { getPack, publicPack } from './packs/index.js';
 import { createSessions } from './auth/session.js';
-import { createPfVerifier } from './auth/pf.js';
+import { createPfVerifier, createVerifier } from './auth/pf.js';
+import { createMockIdp } from './mockIdp.js';
+import { createNetguard } from './netguard.js';
+import { loadCustomerConfig, publicConfig } from './customer.js';
+import { createWorkspaces, validWorkspace, WorkspaceError, DEFAULT_WORKSPACE, WORKSPACE_HEADER } from './workspaces.js';
 import { createBackend } from './mcp/backend.js';
 import { createPolicyStore } from './policyStore.js';
 import { createApprovals } from './approvals.js';
@@ -20,54 +25,139 @@ import { createPreflight } from './preflight.js';
 import { createTracer } from './trace/hops.js';
 import { createSink, parseTraceparent, newTraceparent } from './trace/index.js';
 
-const WEB_DIST = process.env.WEB_DIST || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../web/dist');
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const WEB_DIST = process.env.WEB_DIST || path.join(ROOT, 'web/dist');
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+const CSP = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
 
-export function createApp({ cfg = config(), now = () => Date.now() } = {}) {
+export const DEMO = (() => {
+  let version = '0.0.0';
+  try { version = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version; } catch { /* keep the default */ }
+  return { id: 'privilege-demo', name: 'Privilege demo LAB', version };
+})();
+
+export function createApp({ cfg = config(), now = () => Date.now(), fetchImpl = globalThis.fetch, customerFile } = {}) {
   init();
   const app = express();
   app.disable('x-powered-by');
   if (process.env.TRUST_PROXY) app.set('trust proxy', process.env.TRUST_PROXY);
-  app.use(express.json({ limit: '64kb' }));
 
-  const sink = createSink({ size: 500 });
-  const tracer = createTracer({ sink, now });
-  const audit = createAudit({ dataDir: cfg.dataDir, now });
+  // ---- mode: mock (default, all in process) or live (Bearer tokens from the configured PingFederate). The page toggles it. ----
+  let currentMode = cfg.idp === 'pf' ? 'live' : 'mock';
+  const mode = () => currentMode;
+  const liveReady = () => liveProblems(cfg).length === 0;
+
   const pack = getPack(cfg.pack) ?? getPack('generic'); // personas, agent, tools, schema and shipped policies of the chosen vertical
   const { personas: PERSONAS, agent: AGENT } = pack;
-  const backend = createBackend({ tools: pack.tools });
-  const store = createPolicyStore({ dataDir: cfg.dataDir, pack });
+  const customer = loadCustomerConfig({ file: customerFile });
+  app.locals.customerWarnings = customer.warnings;
+
+  // The netguard is the only door out: nothing leaves the process in mock mode; live mode reaches only the configured PingFederate.
+  const netguard = createNetguard({ mode, liveOrigin: () => { try { return new URL(cfg.pfJwksUrl || cfg.pfUrl).origin; } catch { return null; } }, realFetch: fetchImpl });
+  app.locals.netguard = netguard; // tests and the doctor read its counters
+  const mockIdp = createMockIdp({ now, personas: PERSONAS, agent: AGENT });
+  const verifyMock = createVerifier({ keySource: mockIdp.publicKey, issuer: mockIdp.issuer, audience: mockIdp.audience, clockSkewSec: cfg.clockSkewSec });
+  const verifyPf = cfg.pfJwksUrl ? createPfVerifier(cfg, { fetchImpl: netguard.fetchImpl }) : null;
+
   const sessions = createSessions({ secret: cfg.sessionSecret, ttlMs: cfg.sessionTtlMs, now });
-  const verifyPf = cfg.pfJwksUrl ? createPfVerifier(cfg) : null;
-  const approvals = createApprovals({
-    now, ttlMs: cfg.approvalTtlMs,
-    onExpire(r) {
-      const tp = tracer.emit(r.traceparent, { hop: 'approval', subject: r.claims.sub, ...(pack.attribution ? { actor: r.claims.act?.sub ? { sub: r.claims.act.sub } : null, tool: r.tool } : {}), decision: { result: 'deny', rule: 'approval-expired', reason: 'expired without an answer' } }).traceparent;
-      r.traceparent = tp;
-      audit.write({ kind: 'approval', approval_id: r.id, sub: r.claims.sub, tool: r.tool, approved: false, outcome: 'deny', rule: 'approval-expired', executed: false, trace_id: tp.split('-')[1] });
+  const preflight = createPreflight({ cfg, mode, now, fetchImpl: netguard.fetchImpl });
+
+  // ---- workspaces: one policy store, approval queue, drift state, trace buffer and audit log each ----
+  const workspaces = createWorkspaces({
+    build(id) {
+      const dir = id === DEFAULT_WORKSPACE ? cfg.dataDir : path.join(cfg.dataDir, 'workspaces', id);
+      const sink = createSink({ size: 500 });
+      const tracer = createTracer({ sink, now });
+      const audit = createAudit({ dataDir: dir, now });
+      const backend = createBackend({ tools: pack.tools });
+      const store = createPolicyStore({ dataDir: dir, pack });
+      const approvals = createApprovals({
+        now, ttlMs: cfg.approvalTtlMs,
+        onExpire(r) {
+          const tp = tracer.emit(r.traceparent, { hop: 'approval', subject: r.claims.sub, ...(pack.attribution ? { actor: r.claims.act?.sub ? { sub: r.claims.act.sub } : null, tool: r.tool } : {}), decision: { result: 'deny', rule: 'approval-expired', reason: 'expired without an answer' } }).traceparent;
+          r.traceparent = tp;
+          audit.write({ kind: 'approval', approval_id: r.id, sub: r.claims.sub, tool: r.tool, approved: false, outcome: 'deny', rule: 'approval-expired', executed: false, trace_id: tp.split('-')[1] });
+        },
+      });
+      const pep = createPep({ backend, store, approvals, tracer, audit, now, attribution: pack.attribution });
+      return { id, dir, sink, tracer, audit, backend, store, approvals, pep };
+    },
+    // Run state of one workspace: policies back to the shipped set, no approvals, no drift, an empty trace. Sign-ins and settings stay.
+    reset(ws) {
+      const cleared = { approvals: ws.approvals.list().length, traceEvents: ws.sink.list().length, driftedTools: ws.backend.driftedTools().length };
+      ws.store.reset(); ws.approvals.clear(); ws.backend.resetDrift(); ws.sink.clear();
+      ws.audit.write({ kind: 'reset' });
+      return { workspace: ws.id, cleared };
     },
   });
-  const preflight = createPreflight({ cfg, store, now });
-  const pep = createPep({ backend, store, approvals, tracer, audit, now, attribution: pack.attribution });
+  app.locals.workspaces = workspaces;
+  workspaces.get(DEFAULT_WORKSPACE); // the default workspace exists from the start (its policies are on disk, and the health route can see them)
+  const wsOf = (req) => workspaces.get(req.workspaceId);
 
-  // ---- authentication: Bearer PF token (live) or signed persona session (mock) ----
+  // ---- headers, Host check, workspace id, same-origin writes ----
+  app.use((_req, res, next) => {
+    res.set({ 'X-Frame-Options': 'DENY', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'Content-Security-Policy': CSP });
+    next();
+  });
+  // Only the names this app answers to (loopback, plus LAB_ALLOWED_HOSTS): a rebound DNS name gets nothing, not even the health route.
+  app.use((req, res, next) => (hostAllowed(req.headers.host, cfg) ? next() : res.status(403).json({ error: 'host_not_allowed' })));
+
+  // GET only, no detail (rule 15). The state is ready unless live mode is chosen and not configured, or a policy set is broken.
+  app.get('/api/health', (_req, res) => {
+    const broken = workspaces.ids().some((id) => workspaces.peek(id).store.activeError());
+    const needsSetup = mode() === 'live' && !liveReady();
+    res.set('Cache-Control', 'no-store').json({
+      schema: 'demo-health/1', at: new Date(now()).toISOString(), state: broken ? 'broken' : needsSetup ? 'needs-setup' : 'ready',
+      runtime: mode() === 'mock' ? 'offline' : 'live', demo: DEMO,
+    });
+  });
+
+  app.use((req, res, next) => {
+    res.set('Cache-Control', 'no-store');
+    if (!req.path.startsWith('/api') && req.path !== '/mcp') return next();
+    const id = req.headers[WORKSPACE_HEADER] ?? DEFAULT_WORKSPACE;
+    if (!validWorkspace(id)) return res.status(400).json({ error: 'bad_workspace', fix: 'The workspace id is lowercase letters, digits and hyphens (1 to 32 characters).' });
+    req.workspaceId = id;
+    return next();
+  });
+
+  // A write must come from this app's own pages: a browser sends Origin on a cross-site write, and it must match the Host it reached.
+  // Agents and curl send no Origin and are not browsers, so they pass. A body must be JSON (a cross-site form cannot send that unprompted).
+  app.use((req, res, next) => {
+    if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') return next();
+    const { origin } = req.headers;
+    const site = req.headers['sec-fetch-site'];
+    let originHost = null;
+    if (origin) { try { originHost = new URL(origin).host; } catch { originHost = '?'; } }
+    if ((originHost && originHost !== req.headers.host) || (site && site !== 'same-origin' && site !== 'none')) return res.status(403).json({ error: 'cross_origin_write_refused' });
+    const hasBody = req.headers['content-length'] && req.headers['content-length'] !== '0';
+    if (hasBody && !String(req.headers['content-type'] || '').startsWith('application/json')) return res.status(415).json({ error: 'json_required' });
+    return next();
+  });
+  app.use(express.json({ limit: '64kb' }));
+
+  // ---- authentication: Bearer token (live: PingFederate, mock: the in-process mock issuer) or signed persona session (mock) ----
+  const mockRefusal = (req) => mockRequestRefusal(req, cfg, mode());
   // Returns { ok, claims, source, persona } or { ok:false, status, error, reason }. Emits an auth hop when asked.
   async function authenticate(req, { trace = false, bearerOnly = false } = {}) {
+    const ws = wsOf(req);
     const incoming = parseTraceparent(req.headers.traceparent) ? req.headers.traceparent : newTraceparent();
     let tp = incoming;
     const emit = (result, rule, reason, claims) => {
-      if (trace) ({ traceparent: tp } = tracer.emit(tp, { hop: 'auth', subject: claims?.sub ?? null, actor: claims?.act?.sub ? { sub: claims.act.sub } : null, decision: { result, rule, reason } }));
+      if (trace) ({ traceparent: tp } = ws.tracer.emit(tp, { hop: 'auth', subject: claims?.sub ?? null, actor: claims?.act?.sub ? { sub: claims.act.sub } : null, decision: { result, rule, reason } }));
     };
     const deny = (status, error, reason) => { emit('deny', reason, 'Sign-in check failed'); return { ok: false, status, error, reason, traceparent: tp }; };
 
     if (req.headers.authorization) {
-      if (!verifyPf) return deny(401, 'invalid_token', 'bearer_not_enabled');
-      const v = await verifyPf(req.headers.authorization);
+      const live = mode() === 'live';
+      const verify = live ? verifyPf : verifyMock;
+      if (!verify) return deny(401, 'invalid_token', 'bearer_not_enabled');
+      const v = await verify(req.headers.authorization);
       if (!v.ok) return deny(401, 'invalid_token', v.reason);
-      emit('allow', 'pf-bearer', 'Token verified against the PingFederate JWKS', v.claims);
+      emit('allow', live ? 'pf-bearer' : 'mock-bearer', live ? 'Token verified against the PingFederate JWKS' : 'Mock token verified against the in-process mock issuer (mock)', v.claims);
       return { ok: true, claims: v.claims, source: 'bearer', traceparent: tp };
     }
-    const persona = !bearerOnly && !mockRequestRefusal(req, cfg) ? sessions.read(req.headers.cookie) : null;
+    const persona = !bearerOnly && !mockRefusal(req) ? sessions.read(req.headers.cookie, ws.id) : null;
     const p = persona && Object.hasOwn(PERSONAS, persona) ? PERSONAS[persona] : null;
     if (p && (!p.admin || adminSwitchPresent(cfg))) {
       emit('allow', 'mock-session', `Persona ${p.name} (offline mock)`, p.claims);
@@ -77,7 +167,7 @@ export function createApp({ cfg = config(), now = () => Date.now() } = {}) {
   }
   // A 401 that needs configuration says how to fix it (preflight names the rest).
   const unauthorized = (a) => ({ error: a.error, reason: a.reason,
-    ...(a.reason === 'bearer_not_enabled' ? { fix: 'This server has no PingFederate configured: set IDP=pf, PF_URL and PF_AUDIENCE and restart (GET /api/preflight lists what is missing).' } : {}) });
+    ...(a.reason === 'bearer_not_enabled' ? { fix: 'This server has no PingFederate configured: set PF_URL and PF_AUDIENCE in ~/Development/.env and restart (GET /api/preflight lists what is missing).' } : {}) });
   const authed = (opts, handler) => wrap(async (req, res) => {
     const a = await authenticate(req, opts);
     if (!a.ok) return res.status(401).set('www-authenticate', 'Bearer').json(unauthorized(a));
@@ -87,14 +177,34 @@ export function createApp({ cfg = config(), now = () => Date.now() } = {}) {
   const adminOnly = (opts, handler) => authed(opts, (req, res) =>
     (isAdmin(req.principal.claims) ? handler(req, res) : res.status(403).json({ error: 'admin_only' })));
 
-  app.get('/api/health', (_req, res) => res.json({ ok: true }));
-  app.get('/api/preflight', wrap(async (_req, res) => res.json(await preflight())));
-  app.get('/api/auth/config', (req, res) => res.json({ idp: cfg.idp, mockAvailable: !mockRequestRefusal(req, cfg), bearer: Boolean(verifyPf), pack: publicPack(pack) }));
+  // ---- mode, config, preflight ----
+  const liveFix = () => (liveReady() ? {} : { liveFix: 'Set PF_URL and PF_AUDIENCE in ~/Development/.env (or the file STANDALONE_ENV names), then restart. Mock mode needs nothing.' });
+  const modeView = (req) => ({
+    mode: mode(), liveReady: liveReady(),
+    ...liveFix(),
+    mockSignIn: { allowed: !mockRequestRefusal(req, cfg, 'mock'), refusal: mockRequestRefusal(req, cfg, 'mock') },
+  });
+  app.get('/api/mode', (req, res) => res.json(modeView(req)));
+  app.put('/api/mode', (req, res) => {
+    const refusal = localRequestRefusal(req, cfg);
+    if (refusal) return res.status(403).json({ error: 'mode_change_refused', reason: refusal });
+    const next = req.body?.mode;
+    if (next !== 'mock' && next !== 'live') return res.status(400).json({ error: 'bad_mode', fix: 'mode is mock or live' });
+    if (next === 'live' && !liveReady()) return res.status(409).json({ error: 'live_not_configured', ...modeView(req) });
+    currentMode = next;
+    return res.json(modeView(req));
+  });
+  app.get('/api/preflight', wrap(async (req, res) => res.json(await preflight(wsOf(req).store))));
+  app.get('/api/auth/config', (req, res) => res.json({
+    idp: mode() === 'live' ? 'pf' : 'local-mock', mode: mode(), liveReady: liveReady(), ...liveFix(), workspace: req.workspaceId,
+    mockAvailable: !mockRefusal(req), mockRefusal: mockRefusal(req), bearer: mode() === 'live' ? Boolean(verifyPf) : true, pack: publicPack(pack),
+    customer: publicConfig(customer),
+  }));
 
-  // ---- offline mock sign-in: mounted only when IDP=local-mock AND ALLOW_MOCK_SIGNIN=1; every request re-checks the guards ----
+  // ---- offline mock sign-in: mounted only when ALLOW_MOCK_SIGNIN=1; every request re-checks the guards (loopback, no proxy, mock mode) ----
   if (cfg.mockSignin) {
     const guard = (req, res, next) => {
-      const why = mockRequestRefusal(req, cfg);
+      const why = mockRefusal(req);
       return why ? res.status(403).json({ error: 'mock_signin_refused', reason: why }) : next();
     };
     app.get('/api/auth/mock/personas', guard, (_req, res) => res.json({
@@ -104,22 +214,36 @@ export function createApp({ cfg = config(), now = () => Date.now() } = {}) {
       const id = req.body?.persona;
       const p = typeof id === 'string' && Object.hasOwn(PERSONAS, id) ? PERSONAS[id] : null;
       if (!p || (p.admin && !adminSwitchPresent(cfg))) return res.status(404).json({ error: 'not_found' }); // the admin persona does not exist without the switch file
-      res.set('set-cookie', sessions.cookie(sessions.issue(id), Math.floor(cfg.sessionTtlMs / 1000)));
+      res.set('set-cookie', sessions.cookie(sessions.issue(id, req.workspaceId), Math.floor(cfg.sessionTtlMs / 1000), req.workspaceId));
       return res.json({ ok: true, persona: id });
     });
+    // A mock access token for the signed-in persona, so the /mcp door can be tried offline. Shown whole and labelled mock (rule 4).
+    app.post('/api/mock/token', guard, authed({}, async (req, res) => {
+      const { persona } = req.principal;
+      if (!persona) return res.status(409).json({ error: 'persona_session_required' });
+      const asAgent = req.body?.asAgent === true;
+      const token = await mockIdp.mint({ persona, ...(asAgent ? { act: AGENT.sub } : {}) });
+      res.json({ mock: true, label: 'mock token: signed by the in-process mock issuer, not by PingFederate', access_token: token, expires_in: 600, audience: mockIdp.audience, issuer: mockIdp.issuer });
+    }));
   }
-  app.post('/api/auth/logout', (_req, res) => { res.set('set-cookie', sessions.cookie('', 0)); res.json({ ok: true }); });
+  app.post('/api/auth/logout', (req, res) => { res.set('set-cookie', sessions.cookie('', 0, req.workspaceId)); res.json({ ok: true }); });
 
-  app.get('/api/me', authed({}, (req, res) => {
-    const { claims, source, persona } = req.principal;
-    res.json({ sub: claims.sub, groups: claims.groups ?? [], scope: claims.scope ?? '', isAdmin: isAdmin(claims), source, persona: persona ?? null, ...(pack.web && persona ? { name: PERSONAS[persona]?.name } : {}) });
+  const meView = ({ claims, source, persona }) => ({ sub: claims.sub, groups: claims.groups ?? [], scope: claims.scope ?? '', isAdmin: isAdmin(claims), source, persona: persona ?? null, ...(pack.web && persona ? { name: PERSONAS[persona]?.name } : {}) });
+  app.get('/api/me', authed({}, (req, res) => res.json(meView(req.principal))));
+  // The same answer for the web app, but "nobody is signed in" is a normal 200 with me: null, so the browser console stays clean.
+  app.get('/api/session', wrap(async (req, res) => {
+    const a = await authenticate(req, {});
+    res.json({ me: a.ok ? meView(a) : null });
   }));
 
-  app.get('/api/tools', authed({}, (_req, res) => res.json({
-    tools: backend.listTools().map((t) => ({ name: t.name, app: t._meta.app, description: t.description, inputSchema: t.inputSchema,
-      pinnedHash: backend.pinnedHash(t.name), observedHash: t._meta.schemaHash, drifted: backend.pinnedHash(t.name) !== t._meta.schemaHash,
-      ...(backend.isMock(t.name) ? { mock: true } : {}) })),
-  })));
+  app.get('/api/tools', authed({}, (req, res) => {
+    const { backend } = wsOf(req);
+    res.json({
+      tools: backend.listTools().map((t) => ({ name: t.name, app: t._meta.app, description: t.description, inputSchema: t.inputSchema,
+        pinnedHash: backend.pinnedHash(t.name), observedHash: t._meta.schemaHash, drifted: backend.pinnedHash(t.name) !== t._meta.schemaHash,
+        ...(backend.isMock(t.name) ? { mock: true } : {}) })),
+    });
+  }));
 
   // ---- the PEP, two doors ----
   const STATUS = { allow: 200, hold: 202, deny: 403 };
@@ -129,14 +253,16 @@ export function createApp({ cfg = config(), now = () => Date.now() } = {}) {
     const { tool, args, asAgent, justification } = req.body ?? {};
     // asAgent: Mark's personal agent (Dot) makes the call, so the token carries act and the call is unattended.
     const claims = asAgent === true ? { ...req.principal.claims, act: { sub: AGENT.sub } } : req.principal.claims;
-    const out = pep.enforce({ claims, tool, args: args ?? {}, source: req.principal.source, traceparent: req.principal.traceparent, justification });
+    const out = wsOf(req).pep.enforce({ claims, tool, args: args ?? {}, source: req.principal.source, traceparent: req.principal.traceparent, justification });
     res.set('traceparent', out.traceparent);
-    return res.status(STATUS[out.outcome]).json(publicOutcome(out));
+    // ?envelope=1 (the web console): always 200 with the outcome in the body, because a Deny is a result and not a failed request.
+    return res.status(req.query.envelope === '1' ? 200 : STATUS[out.outcome]).json(publicOutcome(out));
   }));
 
   app.post('/mcp', wrap(async (req, res) => {
     const a = await authenticate(req, { trace: true, bearerOnly: true }); // MCP is Bearer only
     if (!a.ok) return res.status(401).set('www-authenticate', 'Bearer').json(unauthorized(a));
+    const { backend, pep } = wsOf(req);
     const msg = req.body;
     if (!msg || typeof msg !== 'object' || Array.isArray(msg) || msg.jsonrpc !== '2.0') return res.status(400).json({ jsonrpc: '2.0', id: null, error: { code: -32600, message: 'Invalid Request' } });
     if (msg.id === undefined) return res.status(202).end();
@@ -156,14 +282,18 @@ export function createApp({ cfg = config(), now = () => Date.now() } = {}) {
   const mayDecide = (claims, record) => claims.sub !== record.claims.sub && (isAdmin(claims) || record.approvers.includes(claims.sub));
   const mine = (claims, record) => isAdmin(claims) || record.approvers.includes(claims.sub) || record.claims.sub === claims.sub;
 
-  app.get('/api/approvals', authed({}, (req, res) =>
-    res.json({ approvals: approvals.list().filter((r) => mine(req.principal.claims, r)).map(approvals.view) })));
+  app.get('/api/approvals', authed({}, (req, res) => {
+    const { approvals } = wsOf(req);
+    res.json({ approvals: approvals.list().filter((r) => mine(req.principal.claims, r)).map(approvals.view) });
+  }));
   app.get('/api/approvals/:id', authed({}, (req, res) => {
+    const { approvals } = wsOf(req);
     const r = approvals.get(req.params.id);
     return r && mine(req.principal.claims, r) ? res.json(approvals.view(r)) : res.status(404).json({ error: 'not_found' });
   }));
   for (const verb of ['approve', 'deny']) {
     app.post(`/api/approvals/:id/${verb}`, authed({ trace: true }, (req, res) => {
+      const { approvals, pep } = wsOf(req);
       const r = approvals.get(req.params.id);
       if (!r || !mine(req.principal.claims, r)) return res.status(404).json({ error: 'not_found' });
       if (!mayDecide(req.principal.claims, r)) return res.status(403).json({ error: 'not_an_approver' });
@@ -175,8 +305,12 @@ export function createApp({ cfg = config(), now = () => Date.now() } = {}) {
 
   // ---- policies (admin) ----
   const problemsOut = (problems) => problems.map((p) => ({ policyId: p.policyId ?? null, message: p.message }));
-  app.get('/api/policies', authed({}, (_req, res) => res.json({ policies: store.list(), error: store.activeError() ? problemsOut(store.activeError()) : null })));
+  app.get('/api/policies', authed({}, (req, res) => {
+    const { store } = wsOf(req);
+    res.json({ policies: store.list(), error: store.activeError() ? problemsOut(store.activeError()) : null });
+  }));
   app.post('/api/policies/validate', adminOnly({}, (req, res) => {
+    const { store } = wsOf(req);
     const { policies, id, text } = req.body ?? {};
     let map = policies;
     if (map === undefined && typeof id === 'string' && typeof text === 'string') {
@@ -186,6 +320,7 @@ export function createApp({ cfg = config(), now = () => Date.now() } = {}) {
     res.json({ ok: v.ok, problems: problemsOut(v.problems) });
   }));
   app.put('/api/policies/:id', adminOnly({}, (req, res) => {
+    const { store, audit } = wsOf(req);
     const { text, state = 'active' } = req.body ?? {};
     if (typeof text !== 'string') return res.status(400).json({ error: 'text_required' });
     const r = store.put(req.params.id, text, state);
@@ -193,6 +328,7 @@ export function createApp({ cfg = config(), now = () => Date.now() } = {}) {
     return r.ok ? res.json({ ok: true }) : res.status(422).json({ ok: false, problems: problemsOut(r.problems) });
   }));
   app.delete('/api/policies/:id', adminOnly({}, (req, res) => {
+    const { store, audit } = wsOf(req);
     const state = req.query.state === 'candidate' ? 'candidate' : 'active';
     const r = store.remove(req.params.id, state);
     audit.write({ kind: 'policy_delete', sub: req.principal.claims.sub, policy: String(req.params.id).slice(0, 100), state, ok: r.ok });
@@ -202,6 +338,7 @@ export function createApp({ cfg = config(), now = () => Date.now() } = {}) {
 
   // Synthetic request -> full decision, plus what the staged Candidate policies would change. Runs nothing, holds nothing.
   app.post('/api/decide-test', authed({}, (req, res) => {
+    const { store, backend } = wsOf(req);
     const { claims, tool, args = {}, approvalCount = 0, drift = false } = req.body ?? {};
     const def = typeof tool === 'string' ? backend.tool(tool) : null;
     if (!def) return res.status(400).json({ error: 'unknown_tool', tools: backend.names() });
@@ -219,18 +356,25 @@ export function createApp({ cfg = config(), now = () => Date.now() } = {}) {
     res.json({ ...active, shadow });
   }));
 
-  // ---- demo controls (admin) ----
+  // ---- demo controls ----
   app.post('/api/admin/drift', adminOnly({}, (req, res) => {
+    const { backend } = wsOf(req);
     const { tool, on } = req.body ?? {};
     return typeof tool === 'string' && typeof on === 'boolean' && backend.setDrift(tool, on) ? res.json({ ok: true, drifted: backend.driftedTools() }) : res.status(400).json({ error: 'bad_request' });
   }));
-  app.post('/api/reset', adminOnly({}, (req, res) => {
-    store.reset(); approvals.clear(); backend.resetDrift(); sink.clear();
-    audit.write({ kind: 'reset', sub: req.principal.claims.sub });
-    res.json({ ok: true });
+  // Reset (rule 3, 13): the current workspace only. Policies back to the shipped set, approvals, drift and trace cleared; sign-ins stay.
+  app.post('/api/reset', adminOnly({}, (req, res) => res.json({ ok: true, ...workspaces.reset(req.workspaceId) })));
+  // The same reset for `npm run reset`, which has no sign-in: allowed from this machine only (loopback, no proxy), or for an admin.
+  app.post('/api/workspaces/:workspace/reset', wrap(async (req, res) => {
+    if (!validWorkspace(req.params.workspace)) return res.status(400).json({ error: 'bad_workspace' });
+    if (localRequestRefusal(req, cfg)) {
+      const a = await authenticate(req);
+      if (!a.ok || !isAdmin(a.claims)) return res.status(403).json({ error: 'reset_refused', fix: 'Run npm run reset on the machine that runs the app, or sign in as an admin.' });
+    }
+    return res.json({ ok: true, ...workspaces.reset(req.params.workspace) });
   }));
 
-  app.get('/api/trace', authed({}, (req, res) => res.json({ events: sink.list({ trace_id: typeof req.query.trace_id === 'string' ? req.query.trace_id : undefined }) })));
+  app.get('/api/trace', authed({}, (req, res) => res.json({ events: wsOf(req).sink.list({ trace_id: typeof req.query.trace_id === 'string' ? req.query.trace_id : undefined }) })));
 
   app.use('/api', (_req, res) => res.status(404).json({ error: 'not_found' }));
 
@@ -241,6 +385,7 @@ export function createApp({ cfg = config(), now = () => Date.now() } = {}) {
   // Never echo the request body or headers: a malformed body is just a 400.
   // eslint-disable-next-line no-unused-vars
   app.use((err, _req, res, _next) => {
+    if (err instanceof WorkspaceError) return res.status(err.status).json({ error: err.code });
     if (err?.type === 'entity.too.large') return res.status(413).json({ error: 'too_large' });
     if (err?.type === 'entity.parse.failed') return res.status(400).json({ error: 'bad_json' });
     console.error(`[privilege-demo] request failed (${err?.name || 'error'})`);

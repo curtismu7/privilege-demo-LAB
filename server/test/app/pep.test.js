@@ -12,6 +12,17 @@ async function world() {
 }
 
 describe('PEP over POST /api/tools/call (session persona)', () => {
+  it('?envelope=1 (the web console) answers 200 for deny and hold with the outcome in the body; without it deny is 403 and hold is 202', async () => {
+    const { mary, mark } = await world();
+    const denied = await mary.post('/api/tools/call?envelope=1').send({ tool: 'pay_invoice', args: { invoiceId: 'INV-1', amount: 50 } });
+    expect(denied.status).toBe(200);
+    expect(denied.body).toMatchObject({ outcome: 'deny', rule: 'default-deny' });
+    const held = await mark.post('/api/tools/call?envelope=1').send({ tool: 'book_fare', args: fare(2400), asAgent: true });
+    expect(held.status).toBe(200);
+    expect(held.body.outcome).toBe('hold');
+    expect((await call(mary, 'pay_invoice', { invoiceId: 'INV-1', amount: 50 })).status).toBe(403);
+    expect((await call(mark, 'book_fare', fare(2400), { asAgent: true })).status).toBe(202);
+  });
   it('allow: Mary searches and files a ticket; the tool result comes back', async () => {
     const { mary } = await world();
     const r = await call(mary, 'search_flights', { query: 'SFO to JFK' });

@@ -12,17 +12,18 @@ describe('mock sign-in: the routes exist only behind both switches', () => {
     expect((await login(app)).status).toBe(404);
     expect((await request(app).get('/api/auth/mock/personas')).status).toBe(404);
   });
-  it('IDP=pf: route absent even with ALLOW_MOCK_SIGNIN=1 (config() derives mockSignin from both)', async () => {
+  it('config() allows mock sign-in only for the literal ALLOW_MOCK_SIGNIN=1, and live mode refuses it per request', async () => {
     const saved = { ...process.env };
-    Object.assign(process.env, { IDP: 'pf', ALLOW_MOCK_SIGNIN: '1' });
+    Object.assign(process.env, { DEMO_MODE: 'live', ALLOW_MOCK_SIGNIN: '1' });
     try {
       const { config } = await import('../../src/config.js');
-      expect(config().mockSignin).toBe(false);
-      process.env.IDP = 'local-mock';
-      expect(config().mockSignin).toBe(true);
+      expect(config()).toMatchObject({ mode: 'live', idp: 'pf', mockSignin: true });
       process.env.ALLOW_MOCK_SIGNIN = 'true';
       expect(config().mockSignin).toBe(false); // only the literal 1
-    } finally { for (const k of ['IDP', 'ALLOW_MOCK_SIGNIN']) { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; } }
+      delete process.env.DEMO_MODE;
+      expect(config()).toMatchObject({ mode: 'mock', idp: 'local-mock' }); // mock is the default
+    } finally { for (const k of ['DEMO_MODE', 'ALLOW_MOCK_SIGNIN']) { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; } }
+    expect(mockRequestRefusal({ headers: { host: 'localhost' }, socket: { localAddress: '127.0.0.1', remoteAddress: '127.0.0.1' } }, { mockSignin: true, host: '127.0.0.1' }, 'live')).toBe('live_mode');
   });
   it('lists personas and signs Mark in; /api/me shows his groups', async () => {
     const ctx = mockApp();
@@ -40,14 +41,18 @@ describe('mock sign-in: the routes exist only behind both switches', () => {
 });
 
 describe('mock sign-in refusals', () => {
-  it('refuses in production', async () => {
+  it('NODE_ENV=production is not a guard: the Docker images set it, and mock sign-in is allowed there on a loopback bind', async () => {
     const r = await login(mockApp({ nodeEnv: 'production' }).app);
-    expect(r.status).toBe(403);
-    expect(r.body).toEqual({ error: 'mock_signin_refused', reason: 'production' });
+    expect(r.status).toBe(200);
   });
-  it('refuses when the listener is not loopback', async () => {
+  it('refuses when the listener is not loopback (unless compose says the port is published on loopback only)', async () => {
     const r = await login(mockApp({ host: '0.0.0.0' }).app);
     expect(r.body.reason).toBe('non_loopback_listener');
+    expect((await login(mockApp({ host: '0.0.0.0', publish: 'loopback' }).app)).status).toBe(200);
+  });
+  it('refuses in live mode', async () => {
+    const r = await login(mockApp({ idp: 'pf', pfUrl: 'https://pf.example', pfIssuer: 'https://pf.example', pfJwksUrl: 'https://pf.example/pf/JWKS', pfAudience: 'a' }).app);
+    expect(r.body).toEqual({ error: 'mock_signin_refused', reason: 'live_mode' });
   });
   it.each(['x-forwarded-for', 'x-forwarded-host', 'x-forwarded-proto', 'forwarded', 'cf-connecting-ip', 'cf-ray', 'true-client-ip', 'via'])(
     'refuses when proxy header %s is present', async (h) => {
@@ -55,12 +60,15 @@ describe('mock sign-in refusals', () => {
       expect(r.status).toBe(403);
       expect(r.body.reason).toBe('proxy_header');
     });
-  it('refuses a non-loopback Host header (DNS rebinding)', async () => {
+  it('refuses a non-loopback Host header (DNS rebinding): the Host check answers first, and the guard says so too', async () => {
     const r = await login(mockApp().app, 'mark', { host: 'demo.example' });
-    expect(r.body.reason).toBe('non_loopback_host');
+    expect(r.status).toBe(403);
+    expect(r.body).toEqual({ error: 'host_not_allowed' });
+    const req = { headers: { host: 'demo.example' }, socket: { localAddress: '127.0.0.1', remoteAddress: '127.0.0.1' } };
+    expect(mockRequestRefusal(req, { mockSignin: true, host: '127.0.0.1' })).toBe('non_loopback_host');
   });
   it('refuses a non-loopback connection (unit: fake sockets)', () => {
-    const cfg = { nodeEnv: '', mockSignin: true, host: '127.0.0.1' };
+    const cfg = { mockSignin: true, host: '127.0.0.1' };
     const req = (local, remote) => ({ headers: { host: 'localhost' }, socket: { localAddress: local, remoteAddress: remote } });
     expect(mockRequestRefusal(req('127.0.0.1', '127.0.0.1'), cfg)).toBeNull();
     expect(mockRequestRefusal(req('::ffff:127.0.0.1', '::1'), cfg)).toBeNull();
@@ -71,6 +79,19 @@ describe('mock sign-in refusals', () => {
   it('proxyHeaderPresent is case-insensitive and ignores ordinary headers', () => {
     expect(proxyHeaderPresent({ 'X-Forwarded-For': 'x' })).toBe(true);
     expect(proxyHeaderPresent({ accept: '*/*', host: 'localhost', cookie: 'a=b' })).toBe(false);
+  });
+  it('/api/session is always 200: me is null when nobody (or a bad cookie or a proxied request) is signed in, the same view as /api/me otherwise', async () => {
+    const ctx = mockApp();
+    expect((await request(ctx.app).get('/api/session')).body).toEqual({ me: null });
+    expect((await request(ctx.app).get('/api/session').set('cookie', 'pd_session=abc.def')).status).toBe(200);
+    const mark = await signedIn(ctx, 'mark');
+    const session = await mark.get('/api/session');
+    expect(session.status).toBe(200);
+    expect(session.body.me).toEqual((await mark.get('/api/me')).body);
+    const proxied = await mark.get('/api/session').set('x-forwarded-for', '9.9.9.9');
+    expect(proxied.status).toBe(200);
+    expect(proxied.body).toEqual({ me: null });
+    expect((await request(ctx.app).get('/api/me')).status).toBe(401); // the API door itself still says 401
   });
   it('a session cookie stops working once a proxy header appears', async () => {
     const ctx = mockApp();

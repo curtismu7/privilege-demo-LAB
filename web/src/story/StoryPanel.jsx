@@ -3,6 +3,8 @@
 import { useMemo, useState } from "react";
 import { storiesForPage, storyById, verticalFor, verticalsOf } from "./stories";
 import { usePack } from "../pack";
+import { useCustomer, withVocabulary } from "../customer";
+import { usePresenter } from "../presenter";
 import { fillAll } from "./fill";
 import { setStoryPrefs, useStoryPrefs } from "./useStoryPrefs";
 import "./StoryPanel.css";
@@ -15,8 +17,10 @@ export default function StoryPanel({ id, defaultOpen = true }) {
   const [open, setOpen] = useState(defaultOpen);
   const [active, setActive] = useState(null);
   const { id: packId } = usePack();
-  const vertical = verticalFor(packId, prefs.vertical);
-  const story = useMemo(() => (raw ? fillAll(raw, vertical) : null), [raw, vertical]);
+  const customer = useCustomer();
+  const vertical = verticalFor(packId, prefs.vertical ?? customer.vertical);
+  // The customer's renamed people and nouns lie over the vertical; the story keeps its {{cast}} tokens.
+  const story = useMemo(() => (raw ? fillAll(raw, withVocabulary(vertical, customer.vocabulary), customer.cast) : null), [raw, vertical, customer]);
   if (!story) return null;
 
   const blocked = prefs.path === "blocked";
@@ -31,7 +35,7 @@ export default function StoryPanel({ id, defaultOpen = true }) {
           <p className="story__eyebrow">Story {story.id} · {vertical.displayName}</p>
           <h2 className="story__title">{story.title}</h2>
         </div>
-        <button type="button" className="btn" aria-expanded={open} aria-controls={bodyId} onClick={() => setOpen(!open)}>
+        <button type="button" aria-expanded={open} aria-controls={bodyId} onClick={() => setOpen(!open)}>
           {open ? "Hide talk track" : "Show talk track"}
         </button>
       </header>
@@ -43,7 +47,7 @@ export default function StoryPanel({ id, defaultOpen = true }) {
                 {verticalsOf(packId).map((v) => <option key={v.id} value={v.id}>{v.id === "generic" ? "Generic" : v.displayName}</option>)}
               </select>
             </label>
-            <div className="seg" role="group" aria-label="Story path">
+            <div className="story__paths" role="group" aria-label="Story path">
               <button type="button" aria-pressed={!blocked} onClick={() => setStoryPrefs({ path: "happy" })}>Allowed</button>
               <button type="button" aria-pressed={blocked} onClick={() => setStoryPrefs({ path: "blocked" })}>Blocked</button>
             </div>
@@ -55,7 +59,7 @@ export default function StoryPanel({ id, defaultOpen = true }) {
           </dl>
           <ol className="story__steps">
             {story.steps.map((s) => (
-              <li key={s.n} className={s.n === current.n ? "is-current" : undefined}>
+              <li key={s.n}>
                 <button type="button" className="story__step" aria-current={s.n === current.n ? "step" : undefined} onClick={() => setActive(s.n)}>
                   <span className="story__n">{s.n}</span>{s.title}
                   {blocked && s.blocked && <span className="story__tag">blocked</span>}
@@ -81,5 +85,6 @@ export default function StoryPanel({ id, defaultOpen = true }) {
 /** Every story that names this page. */
 export function PageStories({ page, defaultOpen = false }) {
   const { id: packId } = usePack();
-  return storiesForPage(page, packId).map((s) => <StoryPanel key={s.id} id={s.id} defaultOpen={defaultOpen} />);
+  const presenter = usePresenter(); // presenter mode opens the talk track
+  return storiesForPage(page, packId).map((s) => <StoryPanel key={`${s.id}${presenter ? "-p" : ""}`} id={s.id} defaultOpen={defaultOpen || presenter} />);
 }

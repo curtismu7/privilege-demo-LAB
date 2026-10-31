@@ -62,8 +62,8 @@ export default function MappingTable({ version = 0 }) {
             <label className="check"><input type="checkbox" checked={dot} onChange={(e) => setDot(e.target.checked)} />The delivery agent acts for the user (token carries act)</label>
           </>
         )}
-        <div style={{ overflowX: "auto" }}>
-          <table className="grid">
+        <div className="scroll-x">
+          <table className="data-table">
             <caption className="sr-only">Decision for each group and tool</caption>
             <thead><tr><th scope="col">Group</th>{TOOL_NAMES.map((t) => <th key={t} scope="col"><code>{t}</code></th>)}</tr></thead>
             <tbody>
@@ -72,7 +72,7 @@ export default function MappingTable({ version = 0 }) {
                   <th scope="row">{g}</th>
                   {TOOL_NAMES.map((t) => {
                     const c = cells?.[`${g}|${t}`];
-                    return <td key={t}>{c ? <><Badge kind={c.outcome} /><span className="rule">{c.rule}</span></> : "…"}</td>;
+                    return <td key={t}>{c ? <><Badge kind={c.outcome} /><span className="data-table__rule">{c.rule}</span></> : "…"}</td>;
                   })}
                 </tr>
               ))}
@@ -86,8 +86,8 @@ export default function MappingTable({ version = 0 }) {
         <section className="card" aria-labelledby="cases-h">
           <h2 id="cases-h">Cases the grid cannot show</h2>
           <p className="muted">Repo scoping, data classification, and what an approval can and cannot change. Each row asks the live policies.</p>
-          <div style={{ overflowX: "auto" }}>
-            <table className="grid">
+          <div className="scroll-x">
+            <table className="data-table">
               <caption className="sr-only">Scenario decisions</caption>
               <thead><tr><th scope="col">Case</th><th scope="col">Tool</th><th scope="col">Decision</th></tr></thead>
               <tbody>
@@ -97,7 +97,7 @@ export default function MappingTable({ version = 0 }) {
                     <tr key={s.id}>
                       <th scope="row">{s.label}</th>
                       <td><code>{s.tool}</code></td>
-                      <td>{c ? <><Badge kind={c.outcome} /><span className="rule">{c.rule}</span></> : "…"}</td>
+                      <td>{c ? <><Badge kind={c.outcome} /><span className="data-table__rule">{c.rule}</span></> : "…"}</td>
                     </tr>
                   );
                 })}

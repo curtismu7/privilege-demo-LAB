@@ -1,36 +1,49 @@
-# OrbStack:  HOST_PORT=18080 docker compose up --build -d   ->  http://localhost:18080
-# The app runs in PF mode (IDP=pf); containers never use the mock sign-in.
-# By default it trusts the LOCAL DEMONSTRATION STUB ISSUER below (not PingFederate), so you can mint test tokens:
-#   docker compose exec -T stub-issuer node stub-issuer/mint.mjs mark
-# To use a real PingFederate instead: set PF_URL and PF_AUDIENCE in ./.env (see .env.example) and start only the app:
-#   docker compose up --build -d privilege-demo
-name: privilege-demo
+# OrbStack:  docker compose up --build -d   ->  http://127.0.0.1:4510   (mock mode; nothing else to set up)
+# The port is published on 127.0.0.1 only (a test pins that). Do not widen it: mock sign-in has no password.
+#
+# Live mode (owner-run) trusts the access tokens of your PingFederate. Put PF_URL and PF_AUDIENCE in your shell or in a local .env
+# next to this file, set DEMO_MODE=live (or press Live in the header), then `docker compose up --build -d`.
+# To try the live path with no PingFederate, add the local stub issuer (NOT PingFederate):
+#   PF_URL=http://stub-issuer:9031 PF_HTTP_HOSTS=stub-issuer PF_AUDIENCE=privilege-demo docker compose --profile stub up --build -d
+#   docker compose exec -T stub-issuer node stub-issuer/mint.mjs priya
+name: privilege-demo-lab
 
 services:
-  privilege-demo:
+  privilege-demo-lab:
     build: .
     ports:
-      - "127.0.0.1:${HOST_PORT:-18080}:8080"
-    env_file:
-      - path: .env
-        required: false
+      - "127.0.0.1:${HOST_PORT:-4510}:4510"
     environment:
-      PORT: "8080"
+      PORT: "4510"
       DATA_DIR: /data
-      IDP: pf
-      ALLOW_MOCK_SIGNIN: "0"
-      APP_ORIGIN: ${APP_ORIGIN:-http://localhost:${HOST_PORT:-18080}}
-      PF_URL: ${PF_URL:-http://stub-issuer:9031}
-      PF_HTTP_HOSTS: ${PF_HTTP_HOSTS:-stub-issuer}
-      PF_AUDIENCE: ${PF_AUDIENCE:-privilege-demo}
+      DEMO_MODE: ${DEMO_MODE:-mock}
+      # Mock sign-in (rule 11) is allowed here because the port above is published on 127.0.0.1 only; LAB_PUBLISH says so.
+      ALLOW_MOCK_SIGNIN: "1"
+      LAB_PUBLISH: loopback
+      # Extra host names the app answers to besides 127.0.0.1 and localhost; every other Host is refused.
+      LAB_ALLOWED_HOSTS: ${LAB_ALLOWED_HOSTS:-}
       PACK: ${PACK:-generic}
+      PF_URL: ${PF_URL:-}
+      PF_AUDIENCE: ${PF_AUDIENCE:-}
+      PF_HTTP_HOSTS: ${PF_HTTP_HOSTS:-}
     volumes:
       - privilege-demo-data:/data
     networks: [demo]
+    restart: unless-stopped
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4510/api/health').then(r=>r.json()).then(j=>process.exit(j.state==='ready'?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
-  # LOCAL DEMONSTRATION ONLY, not PingFederate. Generates a key pair each start and serves its JWKS. Sits on the same user-defined
-  # network as the app (reached at http://stub-issuer:9031), so restarting either container leaves the other reachable.
+  # LOCAL DEMONSTRATION ONLY, not PingFederate. Generates a key pair each start and serves its JWKS. No port is published; it sits on the
+  # same user-defined network as the app (http://stub-issuer:9031). Off unless you pass --profile stub.
   stub-issuer:
+    profiles: ["stub"]
     build:
       context: .
       target: stub
