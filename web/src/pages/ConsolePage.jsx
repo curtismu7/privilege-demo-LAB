@@ -4,6 +4,7 @@ import { usePack } from "../pack";
 import { useSession } from "../session";
 import ArgFields, { defaultArgs } from "../components/ArgFields";
 import Badge from "../components/Badge";
+import MockToken from "../components/MockToken";
 import RequireSignIn from "../components/RequireSignIn";
 import ResultCard from "../components/ResultCard";
 import { PageStories } from "../story/StoryPanel";
@@ -58,7 +59,7 @@ function Console() {
           <label className="field">Justification (shown to an approver; never read by the policy)
             <input type="text" maxLength={500} value={justification} onChange={(e) => setJustification(e.target.value)} />
           </label>
-          <div className="row"><button type="button" className="btn primary" onClick={call} disabled={busy || !tool}>Call as {name}</button></div>
+          <div className="row"><button type="button" className="primary" onClick={call} disabled={busy || !tool}>Call as {name}</button></div>
           <div aria-live="polite"><ResultCard title="PEP decision" res={res} /></div>
         </section>
 
@@ -66,12 +67,12 @@ function Console() {
           <h2 id="tools-h">Tools the server offers</h2>
           <ul className="list">
             {tools.map((t) => (
-              <li key={t.name} className="list-item" style={{ cursor: "default" }}>
+              <li key={t.name} className="list-item list-item--static">
                 <code>{t.name}</code> <span className="muted">app: {t.app}</span>{t.mock && <Badge kind="group">Mock backend</Badge>}
                 <Badge kind={t.drifted ? "deny" : "allow"}>{t.drifted ? "Schema drifted" : "Schema pinned"}</Badge>
-                <span className="why">{t.description}</span>
-                <span className="why mono">pinned {t.pinnedHash.slice(0, 10)} · observed {t.observedHash.slice(0, 10)}</span>
-                <button type="button" className="btn" disabled={!me?.isAdmin} onClick={() => drift(t)}>
+                <span className="list-item__why">{t.description}</span>
+                <span className="list-item__why mono">pinned {t.pinnedHash.slice(0, 10)} · observed {t.observedHash.slice(0, 10)}</span>
+                <button type="button" disabled={!me?.isAdmin} onClick={() => drift(t)}>
                   {t.drifted ? "Restore schema" : "Make schema drift"}
                 </button>
               </li>
@@ -81,6 +82,7 @@ function Console() {
           <p role="status" className="muted">{note}</p>
         </section>
       </div>
+      <MockToken />
     </main>
   );
 }

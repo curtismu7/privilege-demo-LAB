@@ -3,7 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import AppShell from "../../AppShell";
 import ApprovalsPage from "../ApprovalsPage";
 import ConsolePage from "../ConsolePage";
-import DiagramPage, { STEPS } from "../DiagramPage";
+import DiagramPage from "../DiagramPage";
+import { DIAGRAM_IDS, loadDiagram } from "../../diagrams";
 import HomePage from "../HomePage";
 import LearnPage from "../LearnPage";
 import PoliciesPage from "../PoliciesPage";
@@ -45,7 +46,7 @@ describe("sign-in page", () => {
     const { session } = renderAs(<HomePage />);
     fireEvent.click(await screen.findByRole("button", { name: /Mary/ }));
     expect(session.signIn).toHaveBeenCalledWith("mary");
-    expect(screen.getByRole("list", { name: "Mock sign-in guards" })).toHaveTextContent(/Docker containers never offer it/);
+    expect(screen.getByRole("list", { name: "Mock sign-in guards" })).toHaveTextContent(/It is refused in Live mode/);
     expect(await screen.findByText(/Dana \(admin\) is hidden/)).toBeInTheDocument();
   });
   it("shows Bearer guidance and no picker when the server is in pf mode", () => {
@@ -362,62 +363,70 @@ describe("Learn", () => {
 });
 
 describe("Diagram", () => {
-  it("draws the boxes, steps through them, and resets", () => {
+  const nodeEl = () => document.querySelector('[data-id="cedar"]');
+
+  it("draws the boxes of the named diagram, steps through them, and resets", () => {
     renderAs(<DiagramPage />);
     for (const t of ["AI agent (Dot)", "Policy enforcement point", "Cedar engine", "MCP tool server", "Approvals queue", "Trace timeline", "PingFederate"]) expect(screen.getByText(t)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
     expect(screen.getByTestId("step-text")).toHaveTextContent("Step 1 of 7: The agent calls a tool.");
-    fireEvent.click(screen.getByRole("button", { name: /3 · Cedar decides/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
     expect(screen.getByTestId("step-text")).toHaveTextContent("Step 3 of 7: Cedar decides.");
-    fireEvent.click(screen.getByRole("button", { name: "Reset" }));
+    fireEvent.click(screen.getByRole("button", { name: "Reset diagram" }));
     expect(screen.getByTestId("step-text")).toHaveTextContent("Press Simulate");
-    expect(screen.getByRole("button", { name: "Back" })).toBeDisabled();
+  });
+
+  it("offers each named diagram and draws it from data (no boxes are built in JSX)", () => {
+    renderAs(<DiagramPage />);
+    expect(DIAGRAM_IDS).toEqual(["pd-tool-call", "pd-approval", "pd-rug-pull"]);
+    for (const id of DIAGRAM_IDS) {
+      fireEvent.click(screen.getByRole("button", { name: loadDiagram(id).title }));
+      expect(document.querySelector(`[data-diagram="${id}"]`)).not.toBeNull();
+      for (const n of loadDiagram(id).nodes) expect(screen.getAllByText(n.label).length).toBeGreaterThan(0);
+    }
   });
 
   it("Simulate advances on its own, faster at a higher speed, and stops at the end", async () => {
     vi.useFakeTimers();
     renderAs(<DiagramPage />);
-    fireEvent.change(screen.getByLabelText("Speed"), { target: { value: "2" } });
-    expect(screen.getByLabelText("Speed")).toHaveValue("2");
+    fireEvent.change(screen.getByLabelText("Speed"), { target: { value: "fast" } });
     fireEvent.click(screen.getByRole("button", { name: "Simulate" }));
     expect(screen.getByTestId("step-text")).toHaveTextContent("Step 1 of 7");
-    await act(async () => { await vi.advanceTimersByTimeAsync(1400); }); // 2600 / 2 = 1300 ms per step
+    await act(async () => { await vi.advanceTimersByTimeAsync(600); }); // fast = 500 ms per step
     expect(screen.getByTestId("step-text")).toHaveTextContent("Step 2 of 7");
-    for (let i = 0; i < STEPS.length; i++) await act(async () => { await vi.advanceTimersByTimeAsync(1300); });
+    for (let i = 0; i < 8; i++) await act(async () => { await vi.advanceTimersByTimeAsync(600); });
     expect(screen.getByTestId("step-text")).toHaveTextContent("Step 7 of 7");
-    expect(screen.getByRole("button", { name: "Simulate" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Resume" })).toBeInTheDocument(); // it stopped on the last step
   });
 
-  it("pauses, and the speed control resets with Reset", async () => {
+  it("pauses, and Reset stops the walkthrough", async () => {
     vi.useFakeTimers();
     renderAs(<DiagramPage />);
     fireEvent.click(screen.getByRole("button", { name: "Simulate" }));
     fireEvent.click(screen.getByRole("button", { name: "Pause" }));
     await act(async () => { await vi.advanceTimersByTimeAsync(10000); });
     expect(screen.getByTestId("step-text")).toHaveTextContent("Step 1 of 7");
-    fireEvent.change(screen.getByLabelText("Speed"), { target: { value: "3" } });
-    fireEvent.click(screen.getByRole("button", { name: "Reset" }));
-    expect(screen.getByLabelText("Speed")).toHaveValue("1");
+    fireEvent.click(screen.getByRole("button", { name: "Reset diagram" }));
+    expect(screen.getByTestId("step-text")).toHaveTextContent("Press Simulate");
   });
 
   it("Reset puts a moved box back where it started", async () => {
     renderAs(<DiagramPage />);
-    const node = () => document.querySelector('[data-id="cedar"]');
-    const before = node().style.transform;
+    const before = nodeEl().style.transform;
     expect(before).toMatch(/translate/);
-    node().focus();
-    fireEvent.keyDown(node(), { key: "Enter" });
-    for (let i = 0; i < 3; i++) fireEvent.keyDown(node(), { key: "ArrowRight" });
-    await waitFor(() => expect(node().style.transform).not.toBe(before));
-    fireEvent.click(screen.getByRole("button", { name: "Reset" }));
-    await waitFor(() => expect(node().style.transform).toBe(before));
+    nodeEl().focus();
+    fireEvent.keyDown(nodeEl(), { key: "Enter" });
+    for (let i = 0; i < 3; i++) fireEvent.keyDown(nodeEl(), { key: "ArrowRight" });
+    await waitFor(() => expect(nodeEl().style.transform).not.toBe(before));
+    fireEvent.click(screen.getByRole("button", { name: "Reset diagram" }));
+    await waitFor(() => expect(nodeEl().style.transform).toBe(before));
   });
 
   it("makes the boxes keyboard focusable and exposes a live region", () => {
     renderAs(<DiagramPage />);
-    const node = document.querySelector('[data-id="cedar"]');
-    expect(node).toHaveAttribute("tabindex", "0");
-    expect(node).toHaveAttribute("aria-label", expect.stringContaining("Cedar engine"));
-    expect(screen.getByTestId("step-text")).toHaveAttribute("aria-live", "polite");
+    expect(nodeEl()).toHaveAttribute("tabindex", "0");
+    expect(nodeEl()).toHaveAttribute("aria-label", expect.stringContaining("Cedar engine"));
+    expect(screen.getByTestId("step-text")).toHaveAttribute("role", "status");
   });
 });

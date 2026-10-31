@@ -83,7 +83,7 @@ function Policies() {
                     <code>{p.id}</code>
                     <Badge kind={p.state}>{p.state === "active" ? "Active" : "Candidate"}</Badge>
                     <Badge kind={p.effect ?? "error"}>{p.effect ?? "?"}</Badge>
-                    <span className="why">{p.reason}{p.approvers ? ` · approvers: ${p.approvers}` : ""}</span>
+                    <span className="list-item__why">{p.reason}{p.approvers ? ` · approvers: ${p.approvers}` : ""}</span>
                   </button>
                 </li>
               ))}
@@ -91,10 +91,10 @@ function Policies() {
             </ul>
             {admin && (
               <div className="row">
-                <button type="button" className="btn" onClick={startNew}>New policy</button>
+                <button type="button" onClick={startNew}>New policy</button>
                 {confirmReset
-                  ? <><button type="button" className="btn primary" onClick={reset}>Confirm reset</button><button type="button" className="btn" onClick={() => setConfirmReset(false)}>Cancel</button></>
-                  : <button type="button" className="btn" onClick={() => setConfirmReset(true)}>Reset demo</button>}
+                  ? <><button type="button" className="primary" onClick={reset}>Confirm reset</button><button type="button" onClick={() => setConfirmReset(false)}>Cancel</button></>
+                  : <button type="button" onClick={() => setConfirmReset(true)}>Reset demo</button>}
               </div>
             )}
           </section>
@@ -113,10 +113,10 @@ function Policies() {
                 <textarea id="policy-text" className="editor" spellCheck={false} value={text} readOnly={!admin} onChange={(e) => setText(e.target.value)} />
                 {admin && (
                   <div className="row">
-                    <button type="button" className="btn" onClick={validate} disabled={!id}>Validate</button>
-                    <button type="button" className="btn primary" onClick={() => save("active")} disabled={!id}>Save as Active</button>
-                    <button type="button" className="btn" onClick={() => save("candidate")} disabled={!id}>Save as Candidate</button>
-                    {current && <button type="button" className="btn" onClick={remove}>Delete {current.state}</button>}
+                    <button type="button" onClick={validate} disabled={!id}>Validate</button>
+                    <button type="button" className="primary" onClick={() => save("active")} disabled={!id}>Save as Active</button>
+                    <button type="button" onClick={() => save("candidate")} disabled={!id}>Save as Candidate</button>
+                    {current && <button type="button" onClick={remove}>Delete {current.state}</button>}
                   </div>
                 )}
               </>

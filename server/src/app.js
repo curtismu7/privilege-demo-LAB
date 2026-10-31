@@ -196,7 +196,7 @@ export function createApp({ cfg = config(), now = () => Date.now(), fetchImpl = 
   app.get('/api/preflight', wrap(async (req, res) => res.json(await preflight(wsOf(req).store))));
   app.get('/api/auth/config', (req, res) => res.json({
     idp: mode() === 'live' ? 'pf' : 'local-mock', mode: mode(), liveReady: liveReady(), workspace: req.workspaceId,
-    mockAvailable: !mockRefusal(req), bearer: mode() === 'live' ? Boolean(verifyPf) : true, pack: publicPack(pack),
+    mockAvailable: !mockRefusal(req), mockRefusal: mockRefusal(req), bearer: mode() === 'live' ? Boolean(verifyPf) : true, pack: publicPack(pack),
     customer: publicConfig(customer),
   }));
 

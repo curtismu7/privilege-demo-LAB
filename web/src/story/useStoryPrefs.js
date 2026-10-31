@@ -3,7 +3,7 @@
 import { useSyncExternalStore } from "react";
 
 const KEY = "privdemo.story.prefs";
-let mem = { vertical: "generic", path: "happy" };
+let mem = { vertical: null, path: "happy" }; // vertical null = the customer's default (customer.config), else generic
 const subs = new Set();
 
 function load() {
@@ -17,7 +17,7 @@ export function setStoryPrefs(patch) {
   subs.forEach((f) => f());
 }
 /** Re-read storage (tests clear it between cases). */
-export function reloadStoryPrefs() { mem = { vertical: "generic", path: "happy" }; load(); subs.forEach((f) => f()); }
+export function reloadStoryPrefs() { mem = { vertical: null, path: "happy" }; load(); subs.forEach((f) => f()); }
 
 const subscribe = (f) => { subs.add(f); return () => subs.delete(f); };
 export const useStoryPrefs = () => useSyncExternalStore(subscribe, () => mem);

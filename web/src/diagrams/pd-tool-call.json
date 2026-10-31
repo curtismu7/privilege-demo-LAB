@@ -1,0 +1,222 @@
+{
+  "schema": "diagram-studio/1",
+  "id": "pd-tool-call",
+  "title": "One tool call, checked",
+  "lede": "An agent's MCP tool call passes the policy enforcement point. Cedar decides allow, deny or hold; only an allow reaches the tool.",
+  "groups": {
+    "agent": {
+      "label": "The agent and its people",
+      "color": "blue"
+    },
+    "pep": {
+      "label": "Policy enforcement point",
+      "color": "red"
+    },
+    "engine": {
+      "label": "Decision and records",
+      "color": "dark"
+    },
+    "backend": {
+      "label": "Identity and tools",
+      "color": "grey"
+    },
+    "wait": {
+      "label": "Waiting for a person",
+      "color": "amber"
+    }
+  },
+  "nodes": [
+    {
+      "id": "agent",
+      "group": "agent",
+      "label": "AI agent (Dot)",
+      "sub": [
+        "Calls MCP tools for Mark",
+        "Sends a Bearer access token"
+      ],
+      "x": 0,
+      "y": 200
+    },
+    {
+      "id": "idp",
+      "group": "backend",
+      "label": "PingFederate",
+      "sub": [
+        "Issued the token",
+        "Publishes the JWKS",
+        "Mock mode: in-process mock"
+      ],
+      "x": 0,
+      "y": 480
+    },
+    {
+      "id": "pep",
+      "group": "pep",
+      "label": "Policy enforcement point",
+      "sub": [
+        "Checks the token",
+        "Asks Cedar, enforces the answer"
+      ],
+      "x": 460,
+      "y": 200
+    },
+    {
+      "id": "cedar",
+      "group": "engine",
+      "label": "Cedar engine",
+      "sub": [
+        "Policies decide",
+        "A forbid beats a permit"
+      ],
+      "x": 920,
+      "y": 0
+    },
+    {
+      "id": "tool",
+      "group": "backend",
+      "label": "MCP tool server",
+      "sub": [
+        "search_flights, create_ticket",
+        "pay_invoice, book_fare"
+      ],
+      "x": 920,
+      "y": 220
+    },
+    {
+      "id": "queue",
+      "group": "wait",
+      "label": "Approvals queue",
+      "sub": [
+        "Holds the call for",
+        "the named approver"
+      ],
+      "x": 920,
+      "y": 440
+    },
+    {
+      "id": "approver",
+      "group": "agent",
+      "label": "Priya (approver)",
+      "sub": [
+        "Approves or denies"
+      ],
+      "x": 1380,
+      "y": 440
+    },
+    {
+      "id": "trace",
+      "group": "engine",
+      "label": "Trace timeline",
+      "sub": [
+        "One event per hop",
+        "One traceparent"
+      ],
+      "x": 460,
+      "y": -40
+    }
+  ],
+  "edges": [
+    {
+      "source": "agent",
+      "target": "pep",
+      "label": "Tool call + token"
+    },
+    {
+      "source": "pep",
+      "target": "idp",
+      "label": "Verify via JWKS",
+      "dashed": true
+    },
+    {
+      "source": "pep",
+      "target": "cedar",
+      "label": "decide(claims, tool)"
+    },
+    {
+      "source": "cedar",
+      "target": "pep",
+      "label": "allow / deny / hold"
+    },
+    {
+      "source": "pep",
+      "target": "tool",
+      "label": "Allow: run tool"
+    },
+    {
+      "source": "pep",
+      "target": "queue",
+      "label": "Hold: queue it"
+    },
+    {
+      "source": "approver",
+      "target": "queue",
+      "label": "Approve or deny"
+    },
+    {
+      "source": "queue",
+      "target": "pep",
+      "label": "Re-check, 1 approval",
+      "dashed": true
+    },
+    {
+      "source": "pep",
+      "target": "trace",
+      "label": "Hop events",
+      "dashed": true
+    }
+  ],
+  "steps": [
+    {
+      "title": "The agent calls a tool",
+      "what": "Dot sends a tools/call request with the user's access token. The enforcement point is the only door to the tools.",
+      "edges": [
+        0
+      ]
+    },
+    {
+      "title": "The token is checked",
+      "what": "Signature, issuer, audience and expiry are verified against the JWKS (PingFederate in live mode, the in-process mock issuer in mock mode). The groups claim is read from it. A bad token ends here with a 401.",
+      "edges": [
+        1
+      ]
+    },
+    {
+      "title": "Cedar decides",
+      "what": "The claims, the tool, its app, the arguments and the schema hashes go to Cedar. It answers allow or deny and names the deciding policy. A deny whose forbids all name approvers becomes a hold.",
+      "edges": [
+        2,
+        3
+      ]
+    },
+    {
+      "title": "Allow: the tool runs",
+      "what": "Only an allow reaches the tool server. The result goes back to the agent with the decision.",
+      "edges": [
+        4
+      ]
+    },
+    {
+      "title": "Hold: a person is asked",
+      "what": "A held call is queued for the policy's approvers and nothing runs. The requester cannot approve their own request.",
+      "edges": [
+        5,
+        6
+      ]
+    },
+    {
+      "title": "The answer re-checks the call",
+      "what": "On approve the enforcement point asks Cedar again with one approval and runs the tool at most once. A deny, or no answer in time, ends the call.",
+      "edges": [
+        7,
+        4
+      ]
+    },
+    {
+      "title": "Every hop is traced",
+      "what": "Auth, Cedar, enforcement point, tool and approval each emit an event on the same traceparent: who, the decision, the rule, the latency. No token is stored.",
+      "edges": [
+        8
+      ]
+    }
+  ]
+}

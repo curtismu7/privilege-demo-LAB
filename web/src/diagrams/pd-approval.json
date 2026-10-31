@@ -1,0 +1,178 @@
+{
+  "schema": "diagram-studio/1",
+  "id": "pd-approval",
+  "title": "A held call, approved",
+  "lede": "Mark's agent asks to book a $2,400 fare. Policy holds it; Priya approves; it runs once.",
+  "groups": {
+    "agent": {
+      "label": "The agent and its people",
+      "color": "blue"
+    },
+    "pep": {
+      "label": "Policy enforcement point",
+      "color": "red"
+    },
+    "engine": {
+      "label": "Decision and records",
+      "color": "dark"
+    },
+    "backend": {
+      "label": "Identity and tools",
+      "color": "grey"
+    },
+    "wait": {
+      "label": "Waiting for a person",
+      "color": "amber"
+    }
+  },
+  "nodes": [
+    {
+      "id": "agent",
+      "group": "agent",
+      "label": "Dot, for Mark",
+      "sub": [
+        "Books a fare over $1,000",
+        "Unattended: Mark is not at the keyboard"
+      ],
+      "x": 0,
+      "y": 160
+    },
+    {
+      "id": "pep",
+      "group": "pep",
+      "label": "Policy enforcement point",
+      "sub": [
+        "Asks Cedar",
+        "Queues, then re-checks"
+      ],
+      "x": 460,
+      "y": 160
+    },
+    {
+      "id": "cedar",
+      "group": "engine",
+      "label": "Cedar engine",
+      "sub": [
+        "s01-hold-large-fare",
+        "names Priya as approver"
+      ],
+      "x": 920,
+      "y": 0
+    },
+    {
+      "id": "queue",
+      "group": "wait",
+      "label": "Approvals queue",
+      "sub": [
+        "Pending until answered",
+        "Expires if nobody answers"
+      ],
+      "x": 920,
+      "y": 300
+    },
+    {
+      "id": "approver",
+      "group": "agent",
+      "label": "Priya (approver)",
+      "sub": [
+        "Sees tool, amount, who asked,",
+        "which policy held it"
+      ],
+      "x": 1380,
+      "y": 300
+    },
+    {
+      "id": "tool",
+      "group": "backend",
+      "label": "MCP tool server",
+      "sub": [
+        "book_fare"
+      ],
+      "x": 920,
+      "y": 500
+    }
+  ],
+  "edges": [
+    {
+      "source": "agent",
+      "target": "pep",
+      "label": "book_fare 2400"
+    },
+    {
+      "source": "pep",
+      "target": "cedar",
+      "label": "Ask, no approval"
+    },
+    {
+      "source": "cedar",
+      "target": "pep",
+      "label": "Hold: Priya"
+    },
+    {
+      "source": "pep",
+      "target": "queue",
+      "label": "Queue request"
+    },
+    {
+      "source": "approver",
+      "target": "queue",
+      "label": "Approve"
+    },
+    {
+      "source": "queue",
+      "target": "pep",
+      "label": "Approved",
+      "dashed": true
+    },
+    {
+      "source": "pep",
+      "target": "cedar",
+      "label": "Ask, 1 approval"
+    },
+    {
+      "source": "pep",
+      "target": "tool",
+      "label": "Run once"
+    }
+  ],
+  "steps": [
+    {
+      "title": "The agent asks",
+      "what": "Dot asks to book a $2,400 fare for Mark. The call is unattended, so the limit applies.",
+      "edges": [
+        0
+      ]
+    },
+    {
+      "title": "Cedar says hold",
+      "what": "The forbid s01-hold-large-fare fires and names Priya. Because an approval could end in allow, the call is held, not denied.",
+      "edges": [
+        1,
+        2
+      ]
+    },
+    {
+      "title": "The request waits",
+      "what": "Nothing has run. The request sits in the queue with the policy that held it and the justification text, which the policy never reads.",
+      "edges": [
+        3
+      ]
+    },
+    {
+      "title": "Priya approves",
+      "what": "Mark cannot approve his own request. Priya can, and her identity goes on the record.",
+      "edges": [
+        4
+      ]
+    },
+    {
+      "title": "Re-checked, then run",
+      "what": "The approval is not trusted, it is re-evaluated against the current policies with one approval. If Cedar now allows, the tool runs once.",
+      "edges": [
+        5,
+        6,
+        7
+      ]
+    }
+  ]
+}

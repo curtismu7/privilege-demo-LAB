@@ -1,10 +1,12 @@
+import { getWorkspace } from "./workspace";
+
 // One fetch wrapper for the app's own API (same origin, cookie session). Returns { ok, status, data }; never throws on a
-// non-2xx answer, because deny (403) and hold (202) are normal results here. Nothing is logged.
+// non-2xx answer, because deny (403) and hold (202) are normal results here. Every call names the current workspace. Nothing is logged.
 export async function api(path, { method = "GET", body } = {}) {
   try {
     const res = await fetch(path, {
       method,
-      headers: body === undefined ? undefined : { "content-type": "application/json" },
+      headers: { "x-workspace": getWorkspace(), ...(body === undefined ? {} : { "content-type": "application/json" }) },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     let data = null;
