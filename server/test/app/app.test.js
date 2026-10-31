@@ -8,11 +8,13 @@ import { describe, expect, it } from 'vitest';
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'pd-app-'));
 
 describe('createApp', () => {
-  it('GET /api/health answers {ok:true}', async () => {
+  it('GET /api/health answers demo-health/1 with no detail (rule 15)', async () => {
     const { createApp } = await import('../../src/app.js');
     const res = await request(createApp({ cfg: { ...config(), dataDir: tmp() } })).get('/api/health');
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ ok: true });
+    expect(res.body).toMatchObject({ schema: 'demo-health/1', state: 'ready', runtime: 'offline', demo: { id: 'privilege-demo', name: 'Privilege demo LAB' } });
+    expect(Object.keys(res.body).sort()).toEqual(['at', 'demo', 'runtime', 'schema', 'state']);
+    expect(JSON.stringify(res.body).length).toBeLessThan(4096);
   }, 30_000); // the first call pays for a cold import of the whole app; 5 s was too tight on a loaded runner
 
   it('unknown /api paths are 404 json', async () => {

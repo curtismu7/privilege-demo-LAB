@@ -1,0 +1,7 @@
+{
+  "name": "Harbor Mutual Agent Lab",
+  "tagline": "How our agents get only the access they need",
+  "vertical": "banking",
+  "cast": { "mark": "Alex", "mary": "Jordan", "priya": "Sam", "dana": "Riley" },
+  "vocabulary": { "org": "Harbor Mutual (example)", "approverRole": "the branch supervisor" }
+}

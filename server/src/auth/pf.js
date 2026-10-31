@@ -1,4 +1,6 @@
-// LIVE path: verify "Authorization: Bearer <PingFederate access token>" against the PF JWKS and map the claims.
+// Bearer verification: "Authorization: Bearer <access token>" is verified against a JWKS and the claims are mapped.
+// LIVE path: the PingFederate JWKS (fetched through the netguard, so only the configured origin can be reached).
+// MOCK path: the in-process mock issuer's public key (mockIdp.js); no network at all.
 // Reasons are fixed codes: nothing from the token or the library's message is echoed back.
 import * as jose from 'jose';
 import { mapClaims } from '../cedar/index.js';
@@ -19,18 +21,17 @@ function reasonOf(err) {
   }
 }
 
-export function createPfVerifier(cfg) {
-  const jwks = cfg.pfJwksUrl ? jose.createRemoteJWKSet(new URL(cfg.pfJwksUrl), { cooldownDuration: 10000, timeoutDuration: 3000 }) : null;
+// keySource: a jose key or key-resolving function (a remote JWKS, or the mock issuer's public key).
+export function createVerifier({ keySource, issuer, audience, clockSkewSec }) {
   // Returns { ok:true, claims } or { ok:false, reason, problems? }
   return async function verify(authorization) {
     const raw = /^Bearer ([A-Za-z0-9._~+/=-]+)$/i.exec(authorization || '')?.[1];
     if (!raw) return { ok: false, reason: 'no_bearer' };
-    if (!jwks) return { ok: false, reason: 'pf_not_configured' };
+    if (!keySource) return { ok: false, reason: 'pf_not_configured' };
     let payload;
     try {
-      ({ payload } = await jose.jwtVerify(raw, jwks, {
-        issuer: cfg.pfIssuer, audience: cfg.pfAudience, algorithms: ALGS,
-        clockTolerance: cfg.clockSkewSec, requiredClaims: ['exp', 'sub'],
+      ({ payload } = await jose.jwtVerify(raw, keySource, {
+        issuer, audience, algorithms: ALGS, clockTolerance: clockSkewSec, requiredClaims: ['exp', 'sub'],
       }));
     } catch (e) { return { ok: false, reason: reasonOf(e) }; }
     if (!Array.isArray(payload.groups)) return { ok: false, reason: 'groups_missing' };
@@ -40,4 +41,12 @@ export function createPfVerifier(cfg) {
     if (!mapped.ok) return { ok: false, reason: 'claims_invalid', problems: mapped.problems };
     return { ok: true, claims: picked };
   };
+}
+
+// The live verifier. fetchImpl is the netguard's fetch: in mock mode it refuses everything, in live mode it reaches only PF_URL's origin.
+export function createPfVerifier(cfg, { fetchImpl } = {}) {
+  const keySource = cfg.pfJwksUrl
+    ? jose.createRemoteJWKSet(new URL(cfg.pfJwksUrl), { cooldownDuration: 10000, timeoutDuration: 3000, ...(fetchImpl ? { [jose.customFetch]: fetchImpl } : {}) })
+    : null;
+  return createVerifier({ keySource, issuer: cfg.pfIssuer, audience: cfg.pfAudience, clockSkewSec: cfg.clockSkewSec });
 }
