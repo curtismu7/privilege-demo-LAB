@@ -1,0 +1,47 @@
+{
+  "id": "S63",
+  "title": "Nobody merges, approves or deploys through the agent",
+  "modes": ["console", "policies"],
+  "goal": "Anyone asks {{agent}} to merge a pull request, approve one, change a policy, or deploy. {{vocab.mockNote}}",
+  "obstacle": "These are the actions a compliance regime wants a named person to take. An approval click must not be able to turn them back on.",
+  "control": "Three forbids with no approvers: u20 (merge_pr and approve_pr), u21 (policy.change) and u22 (every tool whose name starts with deploy.). A forbid beats any permit, and with no approvers there is no hold.",
+  "say": "Some doors stay shut. There is no approval that opens them, and the card says which rule shut them.",
+  "steps": [
+    {
+      "n": 1,
+      "title": "Merge is denied",
+      "tell": "As {{eli}} call github.merge_pr. The card says deny by u20-never-merge-or-approve-pr. No approval is created.",
+      "say": "Merge is a person's job, in GitHub.",
+      "why": "Read-only is the default for repositories."
+    },
+    {
+      "n": 2,
+      "title": "Approve is denied too",
+      "tell": "As {{gwen}} call github.approve_pr. Same rule, same answer: a governance reviewer cannot make the agent approve either.",
+      "say": "The agent cannot approve a pull request for anyone.",
+      "why": "An approval by an agent is not an approval by a person."
+    },
+    {
+      "n": 3,
+      "title": "Every deploy tool is denied",
+      "tell": "As {{priya}} call deploy.production, then deploy.staging and deploy.rollback. All deny by u22-never-deploy.",
+      "say": "One pattern covers every deploy tool, including ones added later.",
+      "why": "The rule matches the name prefix deploy., so a new deploy tool is denied on day one."
+    },
+    {
+      "n": 4,
+      "title": "No approval overrides it",
+      "tell": "In AI Policies, Test a request: pick {{ben}}, tool github.merge_pr, set Approvals already given to 3. Still deny by u20. Compare with S62, where one approval turns a hold into an allow.",
+      "say": "Approvals clear a hold. They never clear a forbid.",
+      "why": "Only a forbid that names approvers can become a hold; these name none.",
+      "blocked": {
+        "tell": "As admin ({{dana}}) open u20 in AI Policies, delete the approve_pr part, and save it as a Candidate (not Active). Test a request for github.approve_pr now shows the live deny next to what the Candidate would do.",
+        "say": "Even the admin sees the effect of a change before it touches a live call."
+      }
+    }
+  ],
+  "proof": {
+    "happy": "Result cards for github.merge_pr, github.approve_pr and deploy.production: deny, rules u20 and u22, no approval id. And Test a request with 3 approvals: still deny.",
+    "blocked": "The Test a request shadow diff for a Candidate that weakens u20: it names the decision that would change, while the live answer stays deny."
+  }
+}

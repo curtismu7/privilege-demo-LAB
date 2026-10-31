@@ -1,0 +1,62 @@
+{
+  "id": "S35",
+  "title": "{{dana}} maps groups to tools",
+  "modes": ["policies"],
+  "demos": ["B7", "D1"],
+  "goal": "{{dana}} decides which groups may use which MCP tools at {{vocab.org}}.",
+  "obstacle": "Three kinds of tool, four groups, and one call that must wait for a human.",
+  "control": "Allow, hold or deny per group and tool, answered by the same Cedar policies that guard live calls.",
+  "say": "One table shows what each group can do, and it is computed from the real policies.",
+  "steps": [
+    {
+      "n": 1,
+      "title": "Open the table",
+      "tell": "The Who can call what table on the AI Policies tab asks the policy engine one question per cell: a group, a tool and a typical call.",
+      "say": "Not a diagram of intent. The live answer for every cell.",
+      "why": "The table cannot drift from the policies because it is made from them."
+    },
+    {
+      "n": 2,
+      "title": "Analysts",
+      "tell": "Analysts: search and tickets allow, pay_invoice and book_fare deny.",
+      "say": "This is {{mary}}'s row, the same as S04 from the admin's side.",
+      "why": "Anything no permit covers is denied."
+    },
+    {
+      "n": 3,
+      "title": "Travel agents and the one that waits",
+      "tell": "Travel agents: book_fare allow. Tick Dot acts, fare 2,400: the same cell becomes hold, waiting for {{vocab.approverRole}}.",
+      "say": "Same group, same tool. Who is acting and how much decide whether it waits.",
+      "why": "The hold is the middle answer between yes and no."
+    },
+    {
+      "n": 4,
+      "title": "Finance",
+      "tell": "Finance with the payments:write scope: pay_invoice allow, and nothing else.",
+      "say": "Payments needs the group and the scope.",
+      "why": "Removing the scope in Test a request turns the cell to deny.",
+      "blocked": {
+        "tell": "In Test a request untick payments:write for the finance user. pay_invoice is denied.",
+        "say": "A group alone is not enough for Payments."
+      }
+    },
+    {
+      "n": 5,
+      "title": "Admins",
+      "tell": "Admins: deny in every cell. No shipped policy lets the admins group call tools. Admins edit policies, and that is a different permission.",
+      "say": "Admin is not a master key.",
+      "why": "The table says so plainly, so nobody assumes otherwise."
+    },
+    {
+      "n": 6,
+      "title": "Change a policy, watch the table",
+      "tell": "As {{dana}}, edit and save a policy. The table recomputes.",
+      "say": "Edit a rule and see the effect across all groups.",
+      "why": "A change that surprises someone shows up here first."
+    }
+  ],
+  "proof": {
+    "happy": "The table with one decision per cell, including the one hold.",
+    "blocked": "The table's deny cells, each with its deciding rule printed under the decision."
+  }
+}

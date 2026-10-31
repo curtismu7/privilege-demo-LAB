@@ -1,0 +1,16 @@
+node_modules/
+**/node_modules
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+.data/
+*.log
+*.pem
+*.key
+*.crt
+*.lic
+customer.config.json
+e2e-output/
+.DS_Store

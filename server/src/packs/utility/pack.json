@@ -1,0 +1,319 @@
+{
+  "id": "utility",
+  "label": "Utility / NERC CIP-style (invented groups, mock backends)",
+  "notice": "Utility / NERC CIP-style pack. The groups, people and rules are INVENTED for this demo, and every backend (GitHub, Confluence, backlog, CloudWatch, deploy) is a MOCK. No real system is called.",
+  "agent": {
+    "sub": "delivery-agent",
+    "label": "Delivery agent (acts for the signed-in person)",
+    "defaultOn": true,
+    "groups": [
+      "engineers",
+      "business-analysts"
+    ]
+  },
+  "groups": [
+    "engineers",
+    "governance-reviewers",
+    "business-analysts",
+    "compliance"
+  ],
+  "personas": {
+    "eli": {
+      "name": "Eli",
+      "role": "Engineer (also the 'Pull Request Review' persona)",
+      "line": "Engineer in engineers. Reads PRs and posts review comments in the grid-ops-portal and outage-notifier repos. 'Pull Request Review' is treated as these engineering review rules (read-only, no merge, no approve) until it is clarified.",
+      "claims": {
+        "sub": "eli",
+        "groups": [
+          "engineers"
+        ],
+        "scope": "tools:invoke",
+        "client_id": "privilege-demo-web"
+      }
+    },
+    "gwen": {
+      "name": "Gwen",
+      "role": "Governance reviewer",
+      "line": "Governance reviewer in governance-reviewers. Reads any repo, comments, searches the KB, asks to update a requirement (held for approval).",
+      "claims": {
+        "sub": "gwen",
+        "groups": [
+          "governance-reviewers"
+        ],
+        "scope": "tools:invoke",
+        "client_id": "privilege-demo-web"
+      }
+    },
+    "ben": {
+      "name": "Ben",
+      "role": "Business analyst",
+      "line": "Business analyst in business-analysts. Drafts stories freely; updating a story or a requirement is held for approval.",
+      "claims": {
+        "sub": "ben",
+        "groups": [
+          "business-analysts"
+        ],
+        "scope": "tools:invoke",
+        "client_id": "privilege-demo-web"
+      }
+    },
+    "cora": {
+      "name": "Cora",
+      "role": "Compliance",
+      "line": "Compliance officer in compliance. The only group that may read restricted evidence.",
+      "claims": {
+        "sub": "cora",
+        "groups": [
+          "compliance"
+        ],
+        "scope": "tools:invoke",
+        "client_id": "privilege-demo-web"
+      }
+    },
+    "priya": {
+      "name": "Priya",
+      "role": "Approver, governance lead",
+      "line": "Approver (named by the hold policies). Answers held calls; cannot approve her own.",
+      "claims": {
+        "sub": "priya",
+        "groups": [
+          "governance-reviewers"
+        ],
+        "scope": "tools:invoke",
+        "client_id": "privilege-demo-web"
+      }
+    },
+    "dana": {
+      "name": "Dana",
+      "role": "Admin",
+      "admin": true,
+      "line": "Admin in admins. Edits policies, makes a tool drift (rug pull).",
+      "claims": {
+        "sub": "dana",
+        "groups": [
+          "admins"
+        ],
+        "scope": "tools:invoke policy:admin",
+        "client_id": "privilege-demo-web"
+      }
+    }
+  },
+  "argDefaults": {
+    "github.read_pr": {
+      "repo": "grid-ops-portal",
+      "pr": 42
+    },
+    "github.post_review_comment": {
+      "repo": "grid-ops-portal",
+      "pr": 42,
+      "body": "Please add a test for the outage banner."
+    },
+    "github.merge_pr": {
+      "repo": "grid-ops-portal",
+      "pr": 42
+    },
+    "github.approve_pr": {
+      "repo": "grid-ops-portal",
+      "pr": 42
+    },
+    "kb.search": {
+      "query": "outage notification runbook",
+      "collection": "runbooks"
+    },
+    "cloudwatch.query_logs": {
+      "logGroup": "portal-app",
+      "query": "level=ERROR"
+    },
+    "backlog.create_story_draft": {
+      "title": "Show planned-outage window on the portal"
+    },
+    "backlog.update_story": {
+      "storyId": "ST-101",
+      "change": "Move to Ready for review"
+    },
+    "confluence.update_requirement": {
+      "requirementId": "REQ-17",
+      "change": "Reword acceptance criterion 2"
+    },
+    "policy.change": {
+      "policyId": "u10-engineers-pr-review",
+      "change": "Allow merge"
+    },
+    "deploy.staging": {
+      "service": "grid-ops-portal"
+    },
+    "deploy.production": {
+      "service": "grid-ops-portal"
+    },
+    "deploy.rollback": {
+      "service": "grid-ops-portal"
+    }
+  },
+  "scenarios": [
+    {
+      "id": "pr-comment",
+      "label": "Eli's agent comments on a PR in his repo",
+      "sub": "eli",
+      "groups": [
+        "engineers"
+      ],
+      "tool": "github.post_review_comment",
+      "args": {
+        "repo": "grid-ops-portal",
+        "pr": 42,
+        "body": "Looks good apart from one test."
+      },
+      "agent": true,
+      "expect": {
+        "outcome": "allow",
+        "rule": "u10-engineers-pr-review"
+      }
+    },
+    {
+      "id": "cross-repo",
+      "label": "Eli's agent reads a PR in another team's repo",
+      "sub": "eli",
+      "groups": [
+        "engineers"
+      ],
+      "tool": "github.read_pr",
+      "args": {
+        "repo": "meter-data-lake",
+        "pr": 7
+      },
+      "agent": true,
+      "expect": {
+        "outcome": "deny",
+        "rule": "u40-repo-scope-engineers"
+      }
+    },
+    {
+      "id": "story-hold",
+      "label": "Ben's agent updates a story",
+      "sub": "ben",
+      "groups": [
+        "business-analysts"
+      ],
+      "tool": "backlog.update_story",
+      "args": {
+        "storyId": "ST-101",
+        "change": "Move to Ready for review"
+      },
+      "agent": true,
+      "expect": {
+        "outcome": "hold",
+        "rule": "u30-hold-story-update"
+      }
+    },
+    {
+      "id": "story-held-approved",
+      "label": "The same call after Priya approves (one approval)",
+      "sub": "ben",
+      "groups": [
+        "business-analysts"
+      ],
+      "tool": "backlog.update_story",
+      "args": {
+        "storyId": "ST-101",
+        "change": "Move to Ready for review"
+      },
+      "agent": true,
+      "approvalCount": 1,
+      "expect": {
+        "outcome": "allow",
+        "rule": "u13-analysts-backlog"
+      }
+    },
+    {
+      "id": "merge-no-override",
+      "label": "Eli's agent merges a PR, even with an approval",
+      "sub": "eli",
+      "groups": [
+        "engineers"
+      ],
+      "tool": "github.merge_pr",
+      "args": {
+        "repo": "grid-ops-portal",
+        "pr": 42
+      },
+      "agent": true,
+      "approvalCount": 1,
+      "expect": {
+        "outcome": "deny",
+        "rule": "u20-never-merge-or-approve-pr"
+      }
+    },
+    {
+      "id": "deploy-no-override",
+      "label": "Gwen's agent deploys to production, even with an approval",
+      "sub": "gwen",
+      "groups": [
+        "governance-reviewers"
+      ],
+      "tool": "deploy.production",
+      "args": {
+        "service": "grid-ops-portal"
+      },
+      "agent": true,
+      "approvalCount": 1,
+      "expect": {
+        "outcome": "deny",
+        "rule": "u22-never-deploy"
+      }
+    },
+    {
+      "id": "evidence-denied",
+      "label": "Eli's agent searches restricted audit evidence",
+      "sub": "eli",
+      "groups": [
+        "engineers"
+      ],
+      "tool": "kb.search",
+      "args": {
+        "query": "CIP-007 patch evidence",
+        "collection": "audit-evidence"
+      },
+      "agent": true,
+      "expect": {
+        "outcome": "deny",
+        "rule": "u41-restricted-evidence-compliance-only"
+      }
+    },
+    {
+      "id": "evidence-compliance",
+      "label": "Cora's agent searches the same restricted evidence",
+      "sub": "cora",
+      "groups": [
+        "compliance"
+      ],
+      "tool": "kb.search",
+      "args": {
+        "query": "CIP-007 patch evidence",
+        "collection": "audit-evidence"
+      },
+      "agent": true,
+      "expect": {
+        "outcome": "allow",
+        "rule": "u14-compliance-evidence"
+      }
+    }
+  ],
+  "diagram": {
+    "boxes": {
+      "agent": {
+        "title": "AI agent (delivery agent)",
+        "sub": "Calls MCP tools for the signed-in person; the token carries act = the agent"
+      },
+      "tool": {
+        "title": "MCP tool server (mocks)",
+        "sub": "github.*, kb.search, cloudwatch.query_logs, backlog.*, confluence.*, policy.change, deploy.*"
+      },
+      "approver": {
+        "title": "Priya (approver)",
+        "sub": "Approves or denies a held update"
+      }
+    },
+    "agentStep": "The delivery agent sends a tools/call request with the person's PingFederate access token (sub = the person, act = the agent). The PEP is the only door to the tools; every backend behind it is a mock."
+  },
+  "approvalsHint": "Ben (business analyst): backlog.update_story with the delivery agent making the call."
+}

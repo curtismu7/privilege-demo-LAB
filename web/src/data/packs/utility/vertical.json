@@ -1,0 +1,24 @@
+{
+  "id": "utility",
+  "displayName": "Utility (NERC CIP-style)",
+  "tagline": "Agents help; people merge, approve and deploy",
+  "source": "app pack (invented example; groups and backends are mocks; no customer data)",
+  "brand": { "primary": "#1f5fbf", "headerStart": "#0b2a4a", "headerEnd": "#1f5fbf" },
+  "vocab": {
+    "org": "the utility",
+    "repoTeam": "grid-ops-portal and outage-notifier",
+    "otherRepo": "meter-data-lake",
+    "restrictedItem": "the audit-evidence collection",
+    "approverRole": "the governance lead",
+    "mockNote": "Every backend here is a mock, and the groups are invented for the demo."
+  },
+  "cast": {
+    "eli": { "name": "Eli", "role": "Engineer; also the 'Pull Request Review' persona (engineering review rules until it is clarified)" },
+    "gwen": { "name": "Gwen", "role": "Governance reviewer" },
+    "ben": { "name": "Ben", "role": "Business analyst" },
+    "cora": { "name": "Cora", "role": "Compliance officer" },
+    "priya": { "name": "Priya", "role": "Approver, governance lead" },
+    "dana": { "name": "Dana", "role": "Admin who owns the policies" },
+    "agent": { "name": "the delivery agent", "role": "AI agent acting for the signed-in person" }
+  }
+}

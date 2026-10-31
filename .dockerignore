@@ -1,0 +1,8 @@
+**/node_modules
+**/dist
+.data
+.env
+.env.bak.*
+.git
+.github
+e2e-output

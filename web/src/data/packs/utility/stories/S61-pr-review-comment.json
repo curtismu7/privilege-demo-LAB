@@ -1,0 +1,47 @@
+{
+  "id": "S61",
+  "title": "{{eli}}'s agent reads a PR and posts a review comment",
+  "modes": ["console", "trace"],
+  "goal": "{{eli}} asks {{agent}} to read a pull request in grid-ops-portal and leave a review comment. {{vocab.mockNote}}",
+  "obstacle": "An agent with a GitHub token can do anything the token can: comment, approve, even merge. {{eli}} wants the review help without the rest.",
+  "control": "Cedar permits github.read_pr and github.post_review_comment for the engineers group, and nothing else on GitHub. Each call names the user (token sub), the agent (act) and the tool.",
+  "say": "The agent reviews code for {{eli}}. It cannot approve or merge it, because policy never offers those tools to anyone.",
+  "steps": [
+    {
+      "n": 1,
+      "title": "Sign in as {{eli}}",
+      "tell": "Pick {{eli}} on the sign-in page. The shell shows the group engineers. 'Pull Request Review' is treated as these engineering review rules (read-only, no merge, no approve) until it is clarified.",
+      "say": "This is {{eli}}'s token. The delivery agent will act on it, never beyond it.",
+      "why": "Policy reads the group from the token, not from anything the agent says."
+    },
+    {
+      "n": 2,
+      "title": "Read the PR",
+      "tell": "In the Tool console pick github.read_pr (repo grid-ops-portal, pr 42) and call. The card says allow by u10-engineers-pr-review, with a mock result labelled MOCK.",
+      "say": "A read goes through, and the card names the rule that said yes.",
+      "why": "An allow is as explainable as a deny. The backend is a mock, so the result is labelled."
+    },
+    {
+      "n": 3,
+      "title": "Post a review comment",
+      "tell": "Pick github.post_review_comment with a short body and call. Allow, same policy, still a mock.",
+      "say": "It can comment on the pull request. That is the whole write it gets.",
+      "why": "The only GitHub write in the pack is a review comment."
+    },
+    {
+      "n": 4,
+      "title": "See who did it",
+      "tell": "Open Trace. The policy, pep and tool rows each show the user (eli), the agent (delivery-agent) and the tool (github.post_review_comment).",
+      "say": "Every decision records the person, the agent acting for them, and the tool.",
+      "why": "Attribution comes from the token's sub and act claims, so an agent cannot hide behind the user or the other way round.",
+      "blocked": {
+        "tell": "Open Trace and find a denied call (try github.merge_pr first). The pep row still names eli, delivery-agent and the tool, with the deny and the rule.",
+        "say": "A refusal is recorded with the same attribution as a success."
+      }
+    }
+  ],
+  "proof": {
+    "happy": "The result cards for github.read_pr and github.post_review_comment: allow, u10-engineers-pr-review, result marked mock; and the Trace rows naming eli, delivery-agent and the tool.",
+    "blocked": "The Trace row for a denied github.merge_pr: deny, u20-never-merge-or-approve-pr, user eli, agent delivery-agent."
+  }
+}

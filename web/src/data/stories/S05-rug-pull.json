@@ -1,0 +1,52 @@
+{
+  "id": "S05",
+  "title": "The tool list changed overnight",
+  "modes": ["console"],
+  "demos": ["D6", "D1"],
+  "goal": "{{mary}} uses search_flights, a tool she approved last week.",
+  "obstacle": "The tool server quietly changed the tool's description. Same name, different tool (a rug pull).",
+  "control": "Each tool is pinned by a hash of its name, description and schema at onboarding. The forbid s05-rugpull-pin denies any call when the hash no longer matches.",
+  "say": "Approval is for a specific tool, not a name.",
+  "steps": [
+    {
+      "n": 1,
+      "title": "It works today",
+      "tell": "As {{mary}}, call search_flights in the Tool console. Allowed, and the tool list shows the pinned and observed hashes match.",
+      "say": "Same tool she approved, same hash, so it runs.",
+      "why": "The pin is the approved baseline, taken when the tool was onboarded."
+    },
+    {
+      "n": 2,
+      "title": "The server changes the tool",
+      "tell": "Sign in as {{dana}} and press Make schema drift on search_flights. Its description now says it also forwards a copy to an external address, and the observed hash differs from the pin. ({{dana}} appears only when the host created the admin switch file.)",
+      "say": "Nothing about the name or the endpoint changed. Only what the tool says it does.",
+      "why": "This is what an attacker who controls a tool server does. The name is not enough to trust.",
+      "blocked": {
+        "tell": "Without admin you can still preview it: in Test a request tick that the tool schema changed.",
+        "say": "Any viewer can see what drift would do to a decision."
+      }
+    },
+    {
+      "n": 3,
+      "title": "The same call is refused",
+      "tell": "Call search_flights again as {{mary}}. Denied by s05-rugpull-pin: tool schema changed since it was approved. Her groups no longer matter.",
+      "say": "Her permission is intact. The tool is the thing that changed, so the tool is refused.",
+      "why": "The forbid applies to every principal and every tool whose hash drifts.",
+      "blocked": {
+        "tell": "Call search_flights as {{mary}} after the drift: denied, with the rug-pull policy named and her own permit listed as overridden.",
+        "say": "A forbid beats her permit."
+      }
+    },
+    {
+      "n": 4,
+      "title": "Put it back",
+      "tell": "Press Reset in the AI Policies tab (admin). The drift is cleared and the call is allowed again.",
+      "say": "A reviewed tool is trusted again only because someone re-approved it.",
+      "why": "In a real deployment re-pinning is the review step."
+    }
+  ],
+  "proof": {
+    "happy": "The Tool console list: pinned and observed hashes equal, and the call allowed.",
+    "blocked": "The result card: deny by s05-rugpull-pin with the reason, and the hashes shown as different."
+  }
+}

@@ -1,0 +1,29 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  build:
+    # Repo variable RUNS_ON (a JSON array, e.g. ["ubuntu-latest"]) overrides the self-hosted Mac default.
+    runs-on: ${{ fromJSON(vars.RUNS_ON || '["self-hosted","macOS"]') }}
+    strategy:
+      matrix:
+        # Node 22 on pull requests; 20 and 22 on push to main.
+        node: ${{ fromJSON(github.event_name == 'pull_request' && '[22]' || '[20,22]') }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+  secrets:
+    runs-on: ${{ fromJSON(vars.RUNS_ON || '["self-hosted","macOS"]') }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: PATH="/opt/homebrew/bin:$PATH" gitleaks detect --source . --redact -v

@@ -1,0 +1,54 @@
+{
+  "id": "S62",
+  "title": "{{ben}}'s story update waits for {{priya}}",
+  "modes": ["approvals", "console"],
+  "goal": "{{ben}} asks {{agent}} to update an existing story in the backlog. {{vocab.mockNote}}",
+  "obstacle": "Drafting a new story is harmless. Changing an existing one, or a requirement page, changes the record other people work from.",
+  "control": "backlog.create_story_draft is allowed for business analysts. backlog.update_story and confluence.update_requirement are held by u30 and u31, which name {{priya}} as approver. The call runs once, after she approves.",
+  "say": "The agent drafts freely. Anything that edits the record waits for {{vocab.approverRole}}.",
+  "steps": [
+    {
+      "n": 1,
+      "title": "A draft goes straight through",
+      "tell": "Sign in as {{ben}}. In the Tool console call backlog.create_story_draft. Allow by u13-analysts-backlog, mock result.",
+      "say": "New drafts are low risk, so the agent just does it.",
+      "why": "The control is on the risky verb, not on the whole tool family."
+    },
+    {
+      "n": 2,
+      "title": "An update is held",
+      "tell": "Call backlog.update_story (tick that the delivery agent makes the call). The card says hold, decided by u30-hold-story-update, naming {{priya}}. Nothing has run.",
+      "say": "It did not fail and it did not run. It is waiting for {{vocab.approverRole}}.",
+      "why": "A hold is offered only when an approval could end in allow."
+    },
+    {
+      "n": 3,
+      "title": "{{priya}} sees the request",
+      "tell": "Sign in as {{priya}} and open Approvals. The request shows the tool, the arguments, who asked (ben, through delivery-agent) and which policy held it.",
+      "say": "She sees exactly what she is approving, and who and what is asking.",
+      "why": "The approver sees the user and the agent separately."
+    },
+    {
+      "n": 4,
+      "title": "{{priya}} answers",
+      "tell": "Approve. The call is checked again with one approval, runs once, and the mock result appears on the request.",
+      "say": "One click from the right person and the update goes through.",
+      "why": "Approval is re-evaluated, not trusted: a policy changed in the meantime still applies.",
+      "blocked": {
+        "tell": "Deny. The request shows denied by {{priya}} and the tool never ran.",
+        "say": "{{priya}} said no, and the record is unchanged."
+      }
+    },
+    {
+      "n": 5,
+      "title": "Requirements work the same way",
+      "tell": "As {{ben}} (or {{gwen}}) call confluence.update_requirement: hold by u31-hold-requirement-update, same approver.",
+      "say": "Backlog and requirements share one rule: edits are held.",
+      "why": "Two small policies, each with its own reason on screen."
+    }
+  ],
+  "proof": {
+    "happy": "The approved request: approver {{priya}}, executed, mock result, and the Trace rows (ben, delivery-agent, backlog.update_story).",
+    "blocked": "The denied request: denied by {{priya}}, executed false, and no tool row in the Trace."
+  }
+}

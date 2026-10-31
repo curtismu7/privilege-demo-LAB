@@ -1,0 +1,22 @@
+{
+  "id": "generic",
+  "displayName": "Privilege demo LAB",
+  "tagline": "Policy on every tool call",
+  "source": "app default",
+  "brand": { "primary": "#d20e0f", "headerStart": "#051727", "headerEnd": "#051727" },
+  "vocab": {
+    "org": "the company",
+    "bookItem": "a $2,400 business-class fare",
+    "searchItem": "flight options",
+    "ticketItem": "support tickets",
+    "payItem": "invoices",
+    "toolsThree": "Search, Ticketing and Payments",
+    "approverRole": "the travel-agents lead"
+  },
+  "cast": {
+    "mark": { "name": "Mark", "role": "Traveler whose agent works on his behalf" },
+    "mary": { "name": "Mary", "role": "Analyst who uses agents and MCP tools" },
+    "priya": { "name": "Priya", "role": "Approver, travel-agents lead" },
+    "dana": { "name": "Dana", "role": "Admin who owns the policies" }
+  }
+}

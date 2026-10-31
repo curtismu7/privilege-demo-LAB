@@ -1,0 +1,48 @@
+{
+  "id": "S23",
+  "title": "Cedar says no, even though another rule says yes",
+  "modes": ["policies"],
+  "demos": ["B3", "B5"],
+  "goal": "{{mark}} books a $12,000 fare. The policy set has a permit that lets travel agents book fares.",
+  "obstacle": "A second rule, a hard cap of $10,000, disagrees. Two rules, two answers.",
+  "control": "In Cedar a matching forbid overrides every permit. The result names the deciding forbid and lists the permits it overrode.",
+  "say": "A hard limit stays a hard limit, however many rules say yes.",
+  "steps": [
+    {
+      "n": 1,
+      "title": "Read the two rules",
+      "tell": "In the policy list open s23-permit-travel-agents and s23-forbid-over-cap. One is a permit with a reason, the other a forbid with a reason. Each has a plain-language @reason.",
+      "say": "Two short rules anyone can read.",
+      "why": "The reason text is what the result card and the audit log print."
+    },
+    {
+      "n": 2,
+      "title": "Test a booking",
+      "tell": "In Test a request pick {{mark}}, book_fare, amount 500. Allow, decided by s23-permit-travel-agents.",
+      "say": "Within the cap the permit decides.",
+      "why": "Only the permit matches, so it is the deciding policy.",
+      "blocked": {
+        "tell": "Change the amount to 12000. Deny, decided by s23-forbid-over-cap, and the card lists s23-permit-travel-agents as overridden.",
+        "say": "The permit still matches. The forbid wins, and the card shows both."
+      }
+    },
+    {
+      "n": 3,
+      "title": "An approval cannot clear a cap",
+      "tell": "Tick that Dot acts and make the call at $12,000. Deny, and the deciding policy is s23-forbid-over-cap, not the hold rule; the hold rule is listed under All forbids that fired. At $2,400 the same call is held for approval, and once approved it is allowed.",
+      "say": "A human can lift a limit that names an approver. This one names nobody, so it is final.",
+      "why": "Only a forbid with @approvers becomes a hold, and only when every forbid that fired has them. The cap has none, so it is final."
+    },
+    {
+      "n": 4,
+      "title": "Stage a change safely",
+      "tell": "As {{dana}}, save an edited cap (say 20000) as Candidate. Test the same $12,000 request: the shadow diff shows the live answer and what the Candidate would change. Live decisions do not change until you make it Active.",
+      "say": "See what a change would do before it is live.",
+      "why": "A Candidate is evaluated beside the live set and never decides anything."
+    }
+  ],
+  "proof": {
+    "happy": "The result card for 500: allow by s23-permit-travel-agents, nothing overridden.",
+    "blocked": "The result card for 12000: deny by s23-forbid-over-cap with the permit listed under overridden."
+  }
+}

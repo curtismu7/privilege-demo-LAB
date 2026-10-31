@@ -1,0 +1,22 @@
+{
+  "id": "banking",
+  "displayName": "Bank",
+  "tagline": "Money moves only when policy says so",
+  "source": "app pack (invented example; no customer data)",
+  "brand": { "primary": "#0a3d62", "headerStart": "#0a3d62", "headerEnd": "#1f5fbf" },
+  "vocab": {
+    "org": "the bank",
+    "bookItem": "a $2,400 corporate travel booking on the company card",
+    "searchItem": "rate and branch listings",
+    "ticketItem": "service cases",
+    "payItem": "payment instructions",
+    "toolsThree": "Research, Service Cases and Payments",
+    "approverRole": "the branch supervisor"
+  },
+  "cast": {
+    "mark": { "name": "Mark", "role": "Relationship manager whose agent books travel" },
+    "mary": { "name": "Mary", "role": "Credit analyst" },
+    "priya": { "name": "Priya", "role": "Branch supervisor" },
+    "dana": { "name": "Dana", "role": "Platform admin" }
+  }
+}

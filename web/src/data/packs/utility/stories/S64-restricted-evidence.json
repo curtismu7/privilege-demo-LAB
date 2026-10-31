@@ -1,0 +1,43 @@
+{
+  "id": "S64",
+  "title": "Only {{cora}} reads restricted evidence",
+  "modes": ["console", "policies"],
+  "goal": "{{eli}} asks {{agent}} to search the audit-evidence collection; later {{cora}} asks the same. {{vocab.mockNote}}",
+  "obstacle": "The same tool, kb.search, reads ordinary runbooks and restricted audit evidence. Letting an agent use the tool must not mean letting it read everything.",
+  "control": "Each target carries a data classification from the server's catalog (the caller cannot set it). u41 forbids restricted data to anyone outside the compliance group; u14 permits compliance.",
+  "say": "The tool is the same. The data decides, and only compliance is cleared for restricted data.",
+  "steps": [
+    {
+      "n": 1,
+      "title": "An ordinary search works",
+      "tell": "As {{eli}} call kb.search with collection runbooks. Allow by u11-engineers-research, mock result.",
+      "say": "Runbooks are internal. Engineers can search them.",
+      "why": "Same tool, internal data."
+    },
+    {
+      "n": 2,
+      "title": "Restricted evidence is denied",
+      "tell": "Change the collection to audit-evidence and call again. Deny by u41-restricted-evidence-compliance-only, overriding u11. The same goes for the security-events log group with cloudwatch.query_logs.",
+      "say": "Same tool, same person, different data, different answer.",
+      "why": "Classification is an attribute of the resource, looked up by the server."
+    },
+    {
+      "n": 3,
+      "title": "{{cora}} is cleared",
+      "tell": "Sign in as {{cora}} and call kb.search on audit-evidence. Allow by u14-compliance-evidence.",
+      "say": "Compliance reads the evidence, and the trace shows who and which agent did.",
+      "why": "A named group is cleared, not a tool."
+    },
+    {
+      "n": 4,
+      "title": "The caller cannot relabel the data",
+      "tell": "Try an unknown collection, or an extra classification argument. The call is refused as invalid arguments before policy runs.",
+      "say": "Nobody can talk their way past a label.",
+      "why": "Unknown targets are refused; if one reached policy it would count as restricted."
+    }
+  ],
+  "proof": {
+    "happy": "The result card for kb.search on audit-evidence as {{cora}}: allow, u14-compliance-evidence, mock result.",
+    "blocked": "The result card for kb.search on audit-evidence as {{eli}}: deny, u41-restricted-evidence-compliance-only, overridden u11-engineers-research."
+  }
+}

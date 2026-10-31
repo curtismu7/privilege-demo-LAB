@@ -1,0 +1,48 @@
+# OrbStack:  HOST_PORT=18080 docker compose up --build -d   ->  http://localhost:18080
+# The app runs in PF mode (IDP=pf); containers never use the mock sign-in.
+# By default it trusts the LOCAL DEMONSTRATION STUB ISSUER below (not PingFederate), so you can mint test tokens:
+#   docker compose exec -T stub-issuer node stub-issuer/mint.mjs mark
+# To use a real PingFederate instead: set PF_URL and PF_AUDIENCE in ./.env (see .env.example) and start only the app:
+#   docker compose up --build -d privilege-demo
+name: privilege-demo
+
+services:
+  privilege-demo:
+    build: .
+    ports:
+      - "127.0.0.1:${HOST_PORT:-18080}:8080"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      PORT: "8080"
+      DATA_DIR: /data
+      IDP: pf
+      ALLOW_MOCK_SIGNIN: "0"
+      APP_ORIGIN: ${APP_ORIGIN:-http://localhost:${HOST_PORT:-18080}}
+      PF_URL: ${PF_URL:-http://stub-issuer:9031}
+      PF_HTTP_HOSTS: ${PF_HTTP_HOSTS:-stub-issuer}
+      PF_AUDIENCE: ${PF_AUDIENCE:-privilege-demo}
+      PACK: ${PACK:-generic}
+    volumes:
+      - privilege-demo-data:/data
+    networks: [demo]
+
+  # LOCAL DEMONSTRATION ONLY, not PingFederate. Generates a key pair each start and serves its JWKS. Sits on the same user-defined
+  # network as the app (reached at http://stub-issuer:9031), so restarting either container leaves the other reachable.
+  stub-issuer:
+    build:
+      context: .
+      target: stub
+    networks: [demo]
+    environment:
+      STUB_ISSUER: http://stub-issuer:9031
+      STUB_AUDIENCE: ${PF_AUDIENCE:-privilege-demo}
+      STUB_HOST: 0.0.0.0
+      PACK: ${PACK:-generic}
+
+networks:
+  demo:
+
+volumes:
+  privilege-demo-data:

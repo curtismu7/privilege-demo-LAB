@@ -1,0 +1,22 @@
+{
+  "id": "airlines",
+  "displayName": "Airline",
+  "tagline": "Policy on every flight",
+  "source": "app pack (invented example; no customer data)",
+  "brand": { "primary": "#002244", "headerStart": "#002244", "headerEnd": "#1f5fbf" },
+  "vocab": {
+    "org": "the airline",
+    "bookItem": "a $2,400 business-class fare on a long-haul route",
+    "searchItem": "flight schedules and fares",
+    "ticketItem": "crew-desk tickets",
+    "payItem": "ground-handling invoices",
+    "toolsThree": "Flight Search, the Crew Desk and Payments",
+    "approverRole": "the duty supervisor"
+  },
+  "cast": {
+    "mark": { "name": "Mark", "role": "Frequent flyer whose agent rebooks for him" },
+    "mary": { "name": "Mary", "role": "Operations analyst at the airline" },
+    "priya": { "name": "Priya", "role": "Duty supervisor" },
+    "dana": { "name": "Dana", "role": "Platform admin" }
+  }
+}

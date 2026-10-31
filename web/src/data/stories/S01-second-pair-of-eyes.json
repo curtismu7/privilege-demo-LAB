@@ -1,0 +1,55 @@
+{
+  "id": "S01",
+  "title": "{{mark}}'s booking needs a second pair of eyes",
+  "modes": ["approvals", "console"],
+  "demos": ["D15", "A4", "B1"],
+  "goal": "{{mark}}'s agent, Dot, books {{vocab.bookItem}} for him.",
+  "obstacle": "Over $1,000, an unattended agent call needs a human. {{mark}} cannot approve his own request.",
+  "control": "The Cedar forbid s01-hold-large-fare names {{priya}} as approver. The call is held, and runs once after she approves.",
+  "say": "The agent did not get smarter permissions. A human stayed in the loop for exactly the risky one.",
+  "steps": [
+    {
+      "n": 1,
+      "title": "Dot books the fare",
+      "tell": "Sign in as {{mark}}. In the Tool console pick book_fare, amount 2400, tick the box that Dot makes the call, and add a short justification. Call.",
+      "say": "{{mark}} asked Dot to book it. The call is unattended, so the limit applies.",
+      "why": "The limit is on the agent acting alone. {{mark}} at the keyboard is not held by it."
+    },
+    {
+      "n": 2,
+      "title": "The call is held",
+      "tell": "The result card says hold, decided by s01-hold-large-fare, naming {{priya}} as approver. Nothing has run.",
+      "say": "It did not fail and it did not run. It is waiting for {{vocab.approverRole}}.",
+      "why": "A hold is only offered when an approval could end in allow."
+    },
+    {
+      "n": 3,
+      "title": "{{priya}} sees the request",
+      "tell": "Sign in as {{priya}} and open Approvals. The request shows the tool, the amount, who asked, which policy held it and the justification text.",
+      "say": "She sees exactly what she is approving and why it was held.",
+      "why": "The justification is shown to her but never read by the policy, so typing a clever reason cannot change the decision."
+    },
+    {
+      "n": 4,
+      "title": "{{priya}} answers",
+      "tell": "Approve. The call is checked again against the current policies with one approval, runs once, and the booking confirmation appears on the request.",
+      "say": "One click from the right person and the booking completes.",
+      "why": "Approval is re-evaluated, not trusted: a policy changed in the meantime still applies.",
+      "blocked": {
+        "tell": "Deny. The request shows denied by {{priya}} and the tool never ran. {{mark}} sees the reason on the request.",
+        "say": "{{priya}} said no, and {{mark}} sees why."
+      }
+    },
+    {
+      "n": 5,
+      "title": "Follow it in the trace",
+      "tell": "Open Trace. One request reads auth, cedar, pep (hold), then cedar again, tool and approval after the answer.",
+      "say": "One request, every hop, who decided at each.",
+      "why": "The approver's identity is on the record next to the policy that required her."
+    }
+  ],
+  "proof": {
+    "happy": "The approved request: approver {{priya}}, executed, with the booking result, and the Trace rows for the hold and the approval.",
+    "blocked": "The denied request: denied by {{priya}}, executed false, and no tool hop in the Trace."
+  }
+}

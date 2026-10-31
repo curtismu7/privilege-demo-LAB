@@ -1,0 +1,33 @@
+// The utility pack's schema: the original vocabulary (see ../../cedar/schema.cedarschema) plus resource attributes.
+// The Tool entity carries attributes computed by the server from its own mock catalog, never supplied by the caller:
+//   toolName        the tool's name (a `like "deploy.*"` pattern covers every deploy tool)
+//   repo            the repository a GitHub tool targets (per-repo scoping)
+//   classification  "internal" or "restricted" (restricted evidence is for the compliance group only)
+// The groups are INVENTED for the demo.
+entity Group;
+entity User in [Group];
+entity Agent in [Group];
+entity Tool = {
+  toolName: String,
+  classification: String,
+  repo?: String,
+};
+
+type ToolCallContext = {
+  app: String,
+  args: { amount?: Long },
+  token: {
+    scopes: Set<String>,
+    client_id: String,
+    actor?: String,                     // act.sub from the token: the agent acting for the user
+  },
+  approval_count: Long,
+  pinnedHash: String,
+  observedHash: String,
+};
+
+action "mcp:Invoke", "mcp:InvokeUnattended" appliesTo {
+  principal: [User, Agent],
+  resource: Tool,
+  context: ToolCallContext,
+};

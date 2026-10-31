@@ -1,0 +1,36 @@
+{
+  "id": "S65",
+  "title": "{{eli}}'s agent stays in its own repos",
+  "modes": ["console", "policies"],
+  "goal": "{{eli}} asks {{agent}} to read a pull request in {{vocab.otherRepo}}, a repository his team does not own. {{vocab.mockNote}}",
+  "obstacle": "One GitHub token usually reaches every repository. Per-repo scoping has to live in policy, not in hoping the agent stays in bounds.",
+  "control": "The repository is a resource attribute. u40 forbids engineers any repository outside {{vocab.repoTeam}}; governance reviewers and compliance read any repo; business analysts have none.",
+  "say": "The agent can only look where its person is allowed to look.",
+  "steps": [
+    {
+      "n": 1,
+      "title": "In scope works",
+      "tell": "As {{eli}} call github.read_pr on grid-ops-portal, then on outage-notifier. Both allow by u10.",
+      "say": "His own team's repos are open to him.",
+      "why": "Scope is by repository, set in policy data."
+    },
+    {
+      "n": 2,
+      "title": "Another team's repo is denied",
+      "tell": "Pick repo meter-data-lake and call. Deny by u40-repo-scope-engineers, which overrides u10. The same happens for github.post_review_comment.",
+      "say": "Out of scope is denied by name, not by a missing permission somewhere.",
+      "why": "A forbid with a reason is easier to read in an audit than a silent default deny."
+    },
+    {
+      "n": 3,
+      "title": "Other groups differ",
+      "tell": "As {{gwen}} read the same PR: allow by u12. As {{ben}}: deny by default, business analysts have no repository access.",
+      "say": "Scope follows the group, so the answer changes with the person.",
+      "why": "Governance review needs to see all repos; analysts do not need any."
+    }
+  ],
+  "proof": {
+    "happy": "{{gwen}}'s github.read_pr on meter-data-lake: allow by u12-governance-review.",
+    "blocked": "{{eli}}'s github.read_pr on meter-data-lake: deny by u40-repo-scope-engineers, overridden u10-engineers-pr-review."
+  }
+}

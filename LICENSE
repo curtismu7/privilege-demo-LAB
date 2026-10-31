@@ -1,0 +1,4 @@
+This repository's own code is private and unlicensed.
+
+Third-party: Cedar (@cedar-policy/cedar-wasm 4.14.0) is Apache-2.0, verified from the installed
+package.json and `npm view`. Transitive dependency licences were not reviewed.
