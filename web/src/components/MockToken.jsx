@@ -21,7 +21,7 @@ export default function MockToken() {
     <section className="card" aria-labelledby="token-h">
       <h2 id="token-h">Mock token for the MCP door</h2>
       <p className="muted">Mock mode only. A token for {me.sub}, signed by the in-process mock issuer (not PingFederate), for trying <code>POST /mcp</code> from a terminal.</p>
-      <label className="check"><input type="checkbox" checked={asAgent} onChange={(e) => setAsAgent(e.target.checked)} />{pack.agent.label}</label>
+      <label className="check"><input type="checkbox" checked={asAgent} onChange={(e) => setAsAgent(e.target.checked)} />Token carries <code>act</code>: the agent ({pack.agent.sub}) acts for {me.sub}</label>
       <div className="row"><button type="button" onClick={get}>Get a mock token</button></div>
       {problem && <p role="alert" className="problems">{problem}</p>}
       {out && (

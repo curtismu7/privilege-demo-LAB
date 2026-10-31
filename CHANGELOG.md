@@ -1,8 +1,20 @@
 # Changelog
 
-## Unreleased
+## 0.4.0 (standalone completion)
+
+- Mock mode is the default: an in-process mock issuer signs tokens labelled mock, `POST /api/mock/token` hands one to the signed-in persona, and `/mcp` works offline. Live mode (PingFederate) is the opt-in; the header toggle switches between them on every page and the banner says which is on.
+- Network guard with a self-test and a mutation-proof test: zero outbound calls in mock mode; live mode reaches only `PF_URL`'s origin.
+- One shared settings file (`~/Development/.env` or `STANDALONE_ENV`, allowlisted keys only); `DEMO_MODE` replaces `IDP`; mock sign-in follows rule 11 (`NODE_ENV` is no longer a guard; `LAB_PUBLISH=loopback` for Docker).
+- `GET /api/health` is `demo-health/1`; `npm run doctor` and `npm run reset [workspace]`; workspaces (`X-Workspace`); presenter mode; `customer.config.json` for names and nouns; `docs/talk-track.md`.
+- Host check, same-origin JSON-only writes, bundled fonts, `Content-Security-Policy`.
+- Web: the shared stylesheet and the CSS standard (tokens only), diagram-studio/1 diagrams with Simulate, Reset and speed, a theme picker that only sets `data-theme`.
+- Docker is mock-first (the stub issuer is behind `--profile stub`); app port 4510 (dev server and tests 4760-4769); Node 22; CI on hosted runners (build, test, doctor, forbidden-strings, gitleaks); Learning Hub pack (D1) and shelf entry.
+- Imported without history; internal names and a customer-specific slogan were scrubbed.
+
+## Earlier (before the standalone import)
 
 - Optional vertical pack `PACK=utility` (utility / NERC CIP-style): 13 mock tools, invented groups, per-repo scoping and data classification as Cedar resource attributes, holds for Priya, always-deny merge / approve / policy change / `deploy.*`, user + agent + tool on every trace row, five stories, `npm run e2e:utility`. Default pack and the `/mcp` contract unchanged. Docs: `docs/utility-pack.md`, utility section in `docs/group-to-tool-mapping.md`.
+
 - At 800 px and below the page columns use `minmax(0, 1fr)` so a long policy id cannot widen the page.
 
 ## 0.3.1 (review fixes)

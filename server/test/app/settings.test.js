@@ -28,11 +28,11 @@ describe('the shared settings loader', () => {
   });
 
   it('never keeps admin or worker credentials: they are reported by name and dropped unread', () => {
-    const file = write('PINGONE_ADMIN_CLIENT_ID=a\nPINGONE_ADMIN_CLIENT_SECRET=sentinel-secret-1\nWORKER_CLIENT_SECRET=sentinel-secret-2\nVAULT_PASSWORD=sentinel-secret-3\nPF_URL=https://pf.example\n');
+    const file = write('PINGONE_ADMIN_CLIENT_ID=a\nPINGONE_ADMIN_CLIENT_SECRET=sentinel-secret-1\nWORKER_CLIENT_SECRET=sentinel-secret-2\nVAULT_PASSWORD=sentinel-secret-3\nPINGONE_CLIENT_SECRET=sentinel-secret-4\nSOME_OTHER_APPS_TOKEN=sentinel-secret-5\nPF_URL=https://pf.example\n');
     const env = {};
     const r = loadSharedEnv({ env, file });
     expect(env).toEqual({ PF_URL: 'https://pf.example' });
-    expect(r.refused.sort()).toEqual(['PINGONE_ADMIN_CLIENT_ID', 'PINGONE_ADMIN_CLIENT_SECRET', 'VAULT_PASSWORD', 'WORKER_CLIENT_SECRET']);
+    expect(r.refused.sort()).toEqual(['PINGONE_ADMIN_CLIENT_ID', 'PINGONE_ADMIN_CLIENT_SECRET', 'PINGONE_CLIENT_SECRET', 'VAULT_PASSWORD', 'WORKER_CLIENT_SECRET']); // another app's own key is dropped without comment
     expect(JSON.stringify(r)).not.toContain('sentinel');
     for (const key of ALLOWED) expect(FORBIDDEN.test(key), key).toBe(false);
   });

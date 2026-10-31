@@ -101,12 +101,12 @@
     {
       "source": "pep",
       "target": "cedar",
-      "label": "Ask, no approval"
+      "label": "Ask Cedar"
     },
     {
       "source": "cedar",
       "target": "pep",
-      "label": "Hold: Priya"
+      "label": "Hold, or allow"
     },
     {
       "source": "pep",
@@ -123,11 +123,6 @@
       "target": "pep",
       "label": "Approved",
       "dashed": true
-    },
-    {
-      "source": "pep",
-      "target": "cedar",
-      "label": "Ask, 1 approval"
     },
     {
       "source": "pep",
@@ -167,11 +162,12 @@
     },
     {
       "title": "Re-checked, then run",
-      "what": "The approval is not trusted, it is re-evaluated against the current policies with one approval. If Cedar now allows, the tool runs once.",
+      "what": "The approval is not trusted: the enforcement point asks Cedar again with one approval, against the current policies. If Cedar now allows, the tool runs once.",
       "edges": [
         5,
-        6,
-        7
+        1,
+        2,
+        6
       ]
     }
   ]

@@ -19,7 +19,7 @@ JSON-RPC 2.0 over `POST /mcp`, `Authorization: Bearer <PF access token>` with `s
 
 ## Shelf (demo launcher) notes
 
-- Run it on its own port beside the original, for example 4512: `PACK=utility PORT=4512 IDP=local-mock ALLOW_MOCK_SIGNIN=1 npm start`. Health: `GET /api/health` (`{ "ok": true }`, same as the original).
-- A shelf override entry (in the shelf's own local file, not in this repo) would be a second `privilege-demo`-style entry with `PACK=utility` in its environment and port 4512.
+- Run it on its own port beside the original, for example 4762: `PACK=utility PORT=4762 npm start`. Health: `GET /api/health` (`{ "ok": true }`, same as the original).
+- A shelf override entry (in the shelf's own local file, not in this repo) would be a second `privilege-demo`-style entry with `PACK=utility` in its environment and port 4762.
 - Content-pack checklist when editing: change a policy (`server/src/packs/utility/policies`), then its row in `docs/group-to-tool-mapping.md` (utility section), then the story text (`web/src/data/packs/utility/stories`), then the mutation table in `server/test/cedar/utility-pack.test.js`. A test fails if a story names a policy or tool that no longer exists.
-- Browser check: `npm run build && npm run e2e:utility` (default port 4512, `E2E_PORT` to change).
+- Browser check: `npm run build && npm run e2e:utility` (default port 4762, `E2E_PORT` to change).

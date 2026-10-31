@@ -15,14 +15,20 @@ if (!fs.existsSync(path.join(root, 'web/dist/index.html'))) { console.error('web
 let chromium;
 try { ({ chromium } = await import('playwright')); } catch { console.error('playwright is not installed. Fix: npm install'); process.exit(1); }
 
-const freePort = () => new Promise((resolve) => { const s = net.createServer(); s.listen(0, '127.0.0.1', () => { const { port } = s.address(); s.close(() => resolve(port)); }); });
-const port = await freePort(); // never 8080 or 5173 unless the OS hands one out by chance; ephemeral ports are far above
+// Test ports for this app are 4760-4769 only: the first one that is free.
+const freePort = async () => {
+  for (let port = 4760; port <= 4769; port++) {
+    if (await new Promise((resolve) => { const s = net.createServer(); s.once('error', () => resolve(false)); s.listen(port, '127.0.0.1', () => s.close(() => resolve(true))); })) return port;
+  }
+  throw new Error('no free port in 4760-4769');
+};
+const port = await freePort();
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pd-e2e-'));
 fs.writeFileSync(path.join(dataDir, 'ALLOW_ADMIN_PERSONA'), 'on'); // Dana exists for this run only
 fs.rmSync(OUT, { recursive: true, force: true });
 fs.mkdirSync(OUT, { recursive: true });
 
-const env = { PATH: process.env.PATH, HOME: process.env.HOME, IDP: 'local-mock', ALLOW_MOCK_SIGNIN: '1', HOST: '127.0.0.1', PORT: String(port), DATA_DIR: dataDir, NODE_ENV: '' };
+const env = { PATH: process.env.PATH, HOME: process.env.HOME, STANDALONE_ENV: '/nonexistent/none.env', DEMO_MODE: 'mock', ALLOW_MOCK_SIGNIN: '1', HOST: '127.0.0.1', PORT: String(port), DATA_DIR: dataDir, NODE_ENV: '' };
 const server = spawn(process.execPath, ['server/src/index.js'], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] });
 let serverLog = '';
 server.stdout.on('data', (d) => { serverLog += d; });
@@ -62,7 +68,7 @@ try {
   // One call from the Tool console. Reloads the page first so the result card is always the new one.
   async function call(page, tool, args = {}, { dot = false, justification } = {}) {
     await page.goto(`${BASE}/console`);
-    await page.locator('select').first().selectOption(tool);
+    await page.locator('#main select').first().selectOption(tool);
     for (const [k, v] of Object.entries(args)) await page.locator('label.field', { hasText: new RegExp(`^${k}`) }).locator('input').fill(String(v));
     if (dot) await page.getByLabel(/Dot \(Mark's agent\)/).check();
     if (justification) await page.locator('label.field', { hasText: /^Justification/ }).locator('input').fill(justification);

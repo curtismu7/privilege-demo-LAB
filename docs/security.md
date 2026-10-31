@@ -2,38 +2,46 @@
 
 This is a demo for a trusted laptop or a private lab. It is not a product and it is **not for hosted use**.
 
-## Mock sign-in guards (host-run only)
+## Mock sign-in guards
 
-The persona picker exists only when all of these hold; every request re-checks them:
+The persona picker exists only when all of these hold; every request re-checks them (rule 11):
 
-- `IDP=local-mock` and `ALLOW_MOCK_SIGNIN=1` (the literal `1`).
-- `NODE_ENV` is not `production`; the server refuses to start with the mock on in production.
-- The listener is loopback (`HOST=127.0.0.1`), the socket peer is loopback, the `Host` header is loopback, and no proxy header is present (`Forwarded`, `X-Forwarded-*`, `Via`, `True-Client-IP`, `CF-*`).
+- `ALLOW_MOCK_SIGNIN=1` (the literal `1`) and the app is in Mock mode. In Live mode the picker is refused.
+- The listener is loopback (`HOST=127.0.0.1`), or the port is published on loopback only: the Docker image listens on `0.0.0.0` inside the container, and `docker-compose.yml` sets `LAB_PUBLISH=loopback` because it publishes on `127.0.0.1` only (pinned by `server/test/app/loopback.test.js`). Outside Docker the socket peer must also be loopback.
+- The `Host` header is loopback, and no proxy header is present (`Forwarded`, `X-Forwarded-*`, `Via`, `True-Client-IP`, `CF-*`).
+- `NODE_ENV=production` is **not** a guard: the Docker images set it.
 - Dana (admin) also needs the file `DATA_DIR/ALLOW_ADMIN_PERSONA`; without it she is not offered and her login is a 404.
 
-Docker containers run `NODE_ENV=production`, `IDP=pf`, `ALLOW_MOCK_SIGNIN=0`: the mock routes are not mounted at all. `npm run smoke` proves it against the running container (the mock login is a 404).
+`npm start` sets `ALLOW_MOCK_SIGNIN=1` because it is the loopback-only host-run launch; a direct `node server/src/index.js` does not. The mode toggle (`PUT /api/mode`) and the script reset route (`POST /api/workspaces/<id>/reset`) need the same local-request conditions (loopback, no proxy header, loopback Host); the reset also accepts an admin.
+
+## Network: nothing leaves the machine in mock mode
+
+`server/src/netguard.js` is the only door out. In Mock mode every request is refused before a socket opens and the real `fetch` is never called; in Live mode only the origin of `PF_URL` is reachable (https or the named plain-http stub host, no redirects, a time cap). The guard runs a self-test at start and in `npm run doctor`; tests assert zero attempts across sign-in, the console, approvals, `/mcp`, preflight and health, and a mutation test removes the mock refusal from the module and shows the self-test fails. The page loads nothing from outside the app (fonts are bundled; the CSP is `default-src 'self'`).
+
+Every request must come to a loopback `Host` (plus `LAB_ALLOWED_HOSTS`), so a rebound DNS name gets nothing. A write with an `Origin` that is not the page's own host, or a cross-site `Sec-Fetch-Site`, is refused, and a body must be JSON.
 
 ## Tokens
 
 - Bearer tokens are verified with `jose` against the PingFederate JWKS: issuer, audience, expiry, RS256 or ES256 only (never `none` or HMAC), clock skew at most 60 s.
 - Tokens, claims objects and secrets are never logged, traced, audited or returned. Sentinel tests assert it. Caller-controlled strings that look like credentials are withheld from the audit log.
 - A token with no `groups` claim is refused, not treated as "no groups".
-- The session cookie is signed and `HttpOnly`; it is only used in mock mode.
+- The session cookie is signed, `HttpOnly` and `SameSite=Strict`; it is only used in Mock mode, and there is one per workspace (`pd_session_<workspace>`, with the workspace signed inside it).
+- Mock-issued tokens are made by an in-process issuer (a P-256 key from `createECDH`, never written or printed), carry a `mock` claim and header and an issuer on a `.invalid` host, and are shown whole and labelled mock. Live tokens are verified, never stored or logged.
 
 ## The stub issuer
 
-`stub-issuer/` is **for local demonstration only**. It generates a key pair at every start (in memory, never written or printed), serves its JWKS, and mints tokens for the demo personas. Minting works only from a loopback peer (inside the stub container, via `docker compose exec`); the app container reaches it over the compose network but its mint requests are refused, and the compose file publishes no port for it. Anyone who can run `docker compose exec` on your machine can mint a token; that is the point. Never point a real deployment at it, and never expose its port.
+`stub-issuer/` is **for local demonstration only**. It generates a key pair at every start (in memory, never written or printed), serves its JWKS, and mints tokens for the demo personas. Minting works only from a loopback peer (inside the stub container, via `docker compose --profile stub exec`); the app container reaches it over the compose network but its mint requests are refused, and the compose file publishes no port for it. Anyone who can run `docker compose exec` on your machine can mint a token; that is the point. The stub is only used when you add the `stub` compose profile. Never point a real deployment at it, and never expose its port.
 
 ## What this is not
 
-- **Not multi-tenant.** One policy store, one approval queue and one trace buffer per process; no tenant or workspace ids. Everyone who can sign in sees the same state.
+- **Workspaces are a demo convenience, not tenants.** Each workspace id has its own policy store, approval queue, drift state, trace buffer, audit log and sign-in, so two presenters on one laptop do not collide, and reset clears one. Anyone who can reach the app can name any workspace (at most 20); there is no authorization between them.
 - **Not hosted.** There is no rate limiting and no TLS (the mock session cookie is `SameSite=Strict`, and there is no separate CSRF token). Run it on your own machine.
 - **State is in memory** (approvals, sessions, trace); a restart loses it. Policies and `audit.jsonl` are files under `DATA_DIR`.
 - The admin can edit policies with arbitrary Cedar text; validation checks syntax and schema, not intent.
 
 ## Secrets in the repo
 
-`.env` is gitignored; `.env.example` has no secrets. A gitleaks pre-commit hook (`.githooks/pre-commit`) and CI job guard against commits. No tenant ids or private hostnames are in the repo.
+`.env` is gitignored; `.env.example` has no secrets. Settings come from the shared `~/Development/.env`, of which only this app's keys are read (`server/src/settings.js`); admin and worker credentials are never read. A gitleaks pre-commit hook (`.githooks/pre-commit`) and the CI gitleaks and forbidden-strings jobs guard against commits. No tenant ids or private hostnames are in the repo.
 
 ## Notes added from an integration check
 

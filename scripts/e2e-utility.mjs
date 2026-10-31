@@ -1,6 +1,6 @@
 // Browser run of the utility / NERC CIP-style pack (PACK=utility) on the HOST-RUN app (IDP=local-mock, offline). Run by hand:
 //   npm run build && npm run e2e:utility        (needs a Chromium: npx playwright install chromium, or Google Chrome)
-// Starts the server itself (default port 4512, E2E_PORT to change; never a port in use) with a throwaway DATA_DIR, drives the five
+// Starts the server itself (default port 4762, E2E_PORT to change; never a port in use) with a throwaway DATA_DIR, drives the five
 // pack stories in a real browser, then sweeps every page in light and dark at desktop and 375 px (no sideways scroll, the
 // "invented groups / mock backends" notice present). Screenshots go to e2e-output/utility/. Not part of `npm test` or CI.
 // The groups are INVENTED and every backend is a MOCK; this script checks the page says so.
@@ -16,13 +16,13 @@ if (!fs.existsSync(path.join(root, 'web/dist/index.html'))) { console.error('web
 let chromium;
 try { ({ chromium } = await import('playwright')); } catch { console.error('playwright is not installed. Fix: npm install'); process.exit(1); }
 
-const port = Number(process.env.E2E_PORT) || 4512;
+const port = Number(process.env.E2E_PORT) || 4762;
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pd-e2e-utility-'));
 fs.writeFileSync(path.join(dataDir, 'ALLOW_ADMIN_PERSONA'), 'on');
 fs.rmSync(OUT, { recursive: true, force: true });
 fs.mkdirSync(OUT, { recursive: true });
 
-const env = { PATH: process.env.PATH, HOME: process.env.HOME, IDP: 'local-mock', ALLOW_MOCK_SIGNIN: '1', HOST: '127.0.0.1', PORT: String(port), DATA_DIR: dataDir, NODE_ENV: '', PACK: 'utility' };
+const env = { PATH: process.env.PATH, HOME: process.env.HOME, STANDALONE_ENV: '/nonexistent/none.env', DEMO_MODE: 'mock', ALLOW_MOCK_SIGNIN: '1', HOST: '127.0.0.1', PORT: String(port), DATA_DIR: dataDir, NODE_ENV: '', PACK: 'utility' };
 const server = spawn(process.execPath, ['server/src/index.js'], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] });
 let serverLog = '';
 server.stdout.on('data', (d) => { serverLog += d; });

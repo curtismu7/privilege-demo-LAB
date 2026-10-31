@@ -13,8 +13,10 @@ export const ALLOWED = new Set([
   'PRIVILEGE_DEMO_MODE', 'DEMO_MODE', 'PACK', 'DATA_DIR', 'APPROVAL_TTL_MS', 'SESSION_SECRET', 'SESSION_TTL_MS', 'CLOCK_SKEW_SEC',
   'PF_URL', 'PF_AUDIENCE', 'PF_ISSUER', 'PF_JWKS_URL', 'PF_HTTP_HOSTS',
 ]);
-// Names that must never be in the shared file. Seen in the file, they are reported (by name) and ignored.
-export const FORBIDDEN = /(^|_)(ADMIN|WORKER|VAULT)(_|$)|CLIENT_SECRET|PASSWORD|PRIVATE_KEY|TOKEN/;
+// Names that must never be in the shared file (the family's check-env.sh forbids the same): admin and worker credentials, the vault
+// password, and the PingOne worker client. Seen in the file, they are reported (by name) and ignored. Other apps' own keys are simply
+// not this app's, so they are dropped unread without a word.
+export const FORBIDDEN = /(^|_)(ADMIN|WORKER|VAULT)(_|$)|^PINGONE_CLIENT_(ID|SECRET)$/;
 
 export const sharedEnvPath = (env = process.env) => env.STANDALONE_ENV || path.join(os.homedir(), 'Development', '.env');
 

@@ -10,7 +10,7 @@
 }
 .shell-brand { display: inline-flex; align-items: center; gap: 10px; color: var(--on-box); text-decoration: none; font-weight: 700; }
 .shell-brand img { width: 30px; height: 30px; }
-.shell-nav { display: flex; flex-wrap: wrap; gap: 4px; flex: 1; min-width: 0; }
+.shell-nav { display: flex; flex-wrap: wrap; gap: 4px; flex: 1 1 30rem; min-width: 0; }
 .shell-nav a { padding: 4px 12px; border-radius: 999px; color: var(--on-box); text-decoration: none; font-size: 13px; font-weight: 500; }
 .shell-nav a:hover { text-decoration: underline; }
 .shell-nav a[aria-current="page"] { background: var(--accent-gradient); color: var(--on-accent); font-weight: 700; }

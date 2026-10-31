@@ -1,0 +1,324 @@
+{
+  "schema": "demo-content-pack/1",
+  "id": "privilege-demo",
+  "title": "Privilege demo LAB: Cedar policy on every MCP tool call",
+  "version": "0.4.0",
+  "source": {
+    "repo": "ping-sandbox/privilege-demo-LAB",
+    "commit": "dde0bdd",
+    "generated": "2026-10-31"
+  },
+  "demo": {
+    "id": "privilege-demo",
+    "name": "Privilege demo LAB",
+    "catalog": "D1",
+    "baseUrl": "http://127.0.0.1:4510",
+    "doctor": "/api/health",
+    "tags": [
+      "privilege",
+      "mcp",
+      "cedar",
+      "policy",
+      "agents",
+      "pingfederate"
+    ]
+  },
+  "glossary": [
+    {
+      "id": "pep",
+      "term": "Policy enforcement point",
+      "definition": "The one door to the tools. Every tool call from an agent passes it. It checks the access token, asks the policy engine for a decision, and enforces the answer: run the tool, refuse it, or hold it for a person.",
+      "aliases": [
+        "PEP"
+      ]
+    },
+    {
+      "id": "cedar",
+      "term": "Cedar",
+      "definition": "An open policy language and engine. Policies say who may do what; the engine answers allow or deny and names the deciding policy. Anything no permit covers is denied, and a forbid always beats a permit."
+    },
+    {
+      "id": "forbid-beats-permit",
+      "term": "A forbid beats a permit",
+      "definition": "If any forbid policy matches a request it is denied, even when a permit also matches. That is why a hard cap cannot be overridden by a broad permit."
+    },
+    {
+      "id": "hold",
+      "term": "Hold for approval",
+      "definition": "A deny whose every forbid names approvers becomes a hold: the call is queued, nothing runs, and a named person can approve it. The approval is re-evaluated against the current policies and the tool runs at most once."
+    },
+    {
+      "id": "groups-claim",
+      "term": "Groups claim",
+      "definition": "The access token's groups array. The policies read it to decide which tools a person's agent may call. Whether a real PingFederate puts groups in access tokens is UNVERIFIED and has to be confirmed there."
+    },
+    {
+      "id": "act-claim",
+      "term": "Act claim",
+      "definition": "An object-valued act claim in the token names the agent that is acting for the person (RFC 8693). A call with act is unattended: the person is not at the keyboard, so stricter rules apply."
+    },
+    {
+      "id": "schema-pin",
+      "term": "Schema pin (rug pull)",
+      "definition": "At onboarding each tool's name, description and input schema are hashed and pinned. If the server later changes them, the hashes differ and policy denies the tool for everyone until the schema is restored."
+    },
+    {
+      "id": "traceparent",
+      "term": "traceparent",
+      "definition": "The W3C Trace Context header. Each hop (auth, Cedar, enforcement point, tool, approval) emits an event on the same trace id, so one request reads as one chain."
+    },
+    {
+      "id": "mock-live",
+      "term": "Mock and Live",
+      "definition": "Mock mode runs the sign-in, the access tokens (signed by an in-process mock issuer) and every tool backend inside the app, and nothing leaves the machine. Live mode verifies Bearer access tokens from your own PingFederate. The Cedar decisions are real in both."
+    },
+    {
+      "id": "workspace",
+      "term": "Workspace",
+      "definition": "A name that scopes one presenter's policies, approvals, trace and sign-in. Reset clears only the current workspace."
+    }
+  ],
+  "sources": [
+    {
+      "id": "cedar-docs",
+      "title": "Cedar policy language",
+      "url": "https://docs.cedarpolicy.com/",
+      "kind": "spec",
+      "use": "Background for the policy and decision cards.",
+      "status": "not-read",
+      "checked": "2026-10-31"
+    },
+    {
+      "id": "rfc8693",
+      "title": "RFC 8693: OAuth 2.0 Token Exchange",
+      "url": "https://www.rfc-editor.org/rfc/rfc8693",
+      "kind": "spec",
+      "use": "The act (actor) claim that marks an agent acting for a person.",
+      "status": "not-read",
+      "checked": "2026-10-31"
+    },
+    {
+      "id": "mcp-spec",
+      "title": "Model Context Protocol specification",
+      "url": "https://modelcontextprotocol.io/specification",
+      "kind": "spec",
+      "use": "initialize, tools/list and tools/call over JSON-RPC at POST /mcp.",
+      "status": "not-read",
+      "checked": "2026-10-31"
+    },
+    {
+      "id": "trace-context",
+      "title": "W3C Trace Context",
+      "url": "https://www.w3.org/TR/trace-context/",
+      "kind": "spec",
+      "use": "The traceparent header on every hop.",
+      "status": "not-read",
+      "checked": "2026-10-31"
+    }
+  ],
+  "cards": [
+    {
+      "id": "start",
+      "label": "Start the lab and check it",
+      "group": "setup",
+      "action": {
+        "type": "route",
+        "href": "/"
+      },
+      "description": "Run npm start, then npm run doctor in another terminal. Mock mode needs no settings: pick a persona and go.",
+      "terms": [
+        "mock-live"
+      ]
+    },
+    {
+      "id": "console",
+      "label": "Make a tool call",
+      "group": "try-it",
+      "action": {
+        "type": "route",
+        "href": "/console"
+      },
+      "description": "Call a tool as a signed-in person and see the decision, the deciding policy and what it overrode.",
+      "terms": [
+        "pep",
+        "cedar"
+      ],
+      "story": "S04"
+    },
+    {
+      "id": "hold",
+      "label": "A held call, approved",
+      "group": "try-it",
+      "action": {
+        "type": "route",
+        "href": "/approvals"
+      },
+      "description": "Dot books a $2,400 fare for Mark: it is held, Priya approves, it runs once.",
+      "terms": [
+        "hold",
+        "act-claim"
+      ],
+      "story": "S01"
+    },
+    {
+      "id": "hard-cap",
+      "label": "The hard cap",
+      "group": "try-it",
+      "action": {
+        "type": "route",
+        "href": "/policies"
+      },
+      "description": "Edit and test policies. A forbid over the cap beats the permit.",
+      "terms": [
+        "forbid-beats-permit"
+      ],
+      "story": "S23"
+    },
+    {
+      "id": "mapping",
+      "label": "Groups to tools",
+      "group": "try-it",
+      "action": {
+        "type": "route",
+        "href": "/policies"
+      },
+      "description": "One decision per group and tool, asked of the live policies.",
+      "terms": [
+        "groups-claim"
+      ],
+      "story": "S35"
+    },
+    {
+      "id": "rug-pull",
+      "label": "A tool changes overnight",
+      "group": "try-it",
+      "action": {
+        "type": "route",
+        "href": "/console"
+      },
+      "description": "As the admin make a tool's description drift and watch policy deny it.",
+      "terms": [
+        "schema-pin"
+      ],
+      "story": "S05"
+    },
+    {
+      "id": "trace",
+      "label": "Follow a request through the trace",
+      "group": "concept",
+      "action": {
+        "type": "route",
+        "href": "/trace"
+      },
+      "description": "One row per hop, one traceparent, no tokens stored.",
+      "terms": [
+        "traceparent"
+      ]
+    },
+    {
+      "id": "diagram",
+      "label": "How a call travels",
+      "group": "concept",
+      "action": {
+        "type": "route",
+        "href": "/diagram"
+      },
+      "description": "Three movable diagrams with Simulate, Reset and a speed control.",
+      "terms": [
+        "pep"
+      ]
+    },
+    {
+      "id": "workspaces",
+      "label": "Workspaces and reset",
+      "group": "reference",
+      "action": {
+        "type": "route",
+        "href": "/"
+      },
+      "description": "Pick a workspace name in the header; npm run reset clears only that workspace.",
+      "terms": [
+        "workspace"
+      ]
+    }
+  ],
+  "diagrams": [
+    {
+      "id": "pd-tool-call",
+      "label": "One tool call, checked",
+      "href": "/diagram"
+    },
+    {
+      "id": "pd-approval",
+      "label": "A held call, approved",
+      "href": "/diagram"
+    },
+    {
+      "id": "pd-rug-pull",
+      "label": "A tool changes after approval",
+      "href": "/diagram"
+    }
+  ],
+  "stories": [
+    {
+      "id": "S01",
+      "title": "Mark's booking needs a second pair of eyes",
+      "say": "The agent did not get smarter permissions. A human stayed in the loop for exactly the risky one.",
+      "file": "web/src/data/stories/S01-second-pair-of-eyes.json"
+    },
+    {
+      "id": "S04",
+      "title": "Mary gets 2 of 3 tools",
+      "say": "The agent only gets what Mary is allowed to use, so it cannot be tricked into asking for more.",
+      "file": "web/src/data/stories/S04-two-of-three-tools.json"
+    },
+    {
+      "id": "S05",
+      "title": "The tool list changed overnight",
+      "say": "Approval is for a specific tool, not a name.",
+      "file": "web/src/data/stories/S05-rug-pull.json"
+    },
+    {
+      "id": "S23",
+      "title": "Cedar says no, even though another rule says yes",
+      "say": "A hard limit stays a hard limit, however many rules say yes.",
+      "file": "web/src/data/stories/S23-forbid-beats-permit.json"
+    },
+    {
+      "id": "S35",
+      "title": "Dana maps groups to tools",
+      "say": "One table shows what each group can do, and it is computed from the real policies.",
+      "file": "web/src/data/stories/S35-groups-to-tools.json"
+    },
+    {
+      "id": "S61",
+      "title": "Eli's agent reads a PR and posts a review comment",
+      "say": "The agent reviews code for Eli. It cannot approve or merge it, because policy never offers those tools to anyone.",
+      "file": "web/src/data/packs/utility/stories/S61-pr-review-comment.json"
+    },
+    {
+      "id": "S62",
+      "title": "Ben's story update waits for Priya",
+      "say": "The agent drafts freely. Anything that edits the record waits for the governance lead.",
+      "file": "web/src/data/packs/utility/stories/S62-story-update-held.json"
+    },
+    {
+      "id": "S63",
+      "title": "Nobody merges, approves or deploys through the agent",
+      "say": "Some doors stay shut. There is no approval that opens them, and the card says which rule shut them.",
+      "file": "web/src/data/packs/utility/stories/S63-never-merge-approve-deploy.json"
+    },
+    {
+      "id": "S64",
+      "title": "Only Cora reads restricted evidence",
+      "say": "The tool is the same. The data decides, and only compliance is cleared for restricted data.",
+      "file": "web/src/data/packs/utility/stories/S64-restricted-evidence.json"
+    },
+    {
+      "id": "S65",
+      "title": "Eli's agent stays in its own repos",
+      "say": "The agent can only look where its person is allowed to look.",
+      "file": "web/src/data/packs/utility/stories/S65-repo-scoping.json"
+    }
+  ]
+}
