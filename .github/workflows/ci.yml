@@ -1,4 +1,4 @@
-# Hosted GitHub runners only (a public-facing repo never runs pull requests on someone's own machine). Node 22 (owner decision 2026-10-31).
+# Hosted GitHub runners only (a public-facing repo never runs pull requests on someone's own machine). Node 26 (owner decision 2026-10-31).
 name: CI
 
 on:
@@ -16,7 +16,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
-          node-version: 22
+          node-version: 26
       - run: npm ci
       - run: npm run build
 
@@ -26,7 +26,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
-          node-version: 22
+          node-version: 26
       - run: npm ci
       - run: npm test
 
@@ -36,7 +36,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
-          node-version: 22
+          node-version: 26
       - run: npm ci
       - run: npm run doctor
 

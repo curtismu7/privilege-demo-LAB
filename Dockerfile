@@ -1,6 +1,6 @@
 # Privilege demo LAB in Docker (OrbStack). Build the web app, then run the API server, which also serves web/dist.
 # The default image runs in mock mode: the mock issuer and every tool backend are in the process, and nothing leaves the container.
-FROM node:22-alpine AS build
+FROM node:26-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY web/package.json web/
@@ -10,7 +10,7 @@ COPY web web
 RUN npm run build -w web
 
 # LOCAL DEMONSTRATION ONLY: the stub issuer behind docker compose --profile stub. Not part of the app image.
-FROM node:22-alpine AS stub
+FROM node:26-alpine AS stub
 WORKDIR /app
 ENV NODE_ENV=production
 COPY package.json package-lock.json ./
@@ -27,7 +27,7 @@ USER node
 CMD ["node", "stub-issuer/server.mjs"]
 
 # The app image (the last stage, so a plain `docker build .` produces it).
-FROM node:22-alpine
+FROM node:26-alpine
 WORKDIR /app
 # HOST=0.0.0.0 is inside the container only; docker-compose.yml publishes the port on 127.0.0.1 and sets LAB_PUBLISH=loopback.
 ENV NODE_ENV=production PORT=4510 HOST=0.0.0.0 DATA_DIR=/data

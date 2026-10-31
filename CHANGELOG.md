@@ -8,7 +8,7 @@
 - `GET /api/health` is `demo-health/1`; `npm run doctor` and `npm run reset [workspace]`; workspaces (`X-Workspace`); presenter mode; `customer.config.json` for names and nouns; `docs/talk-track.md`.
 - Host check, same-origin JSON-only writes, bundled fonts, `Content-Security-Policy`.
 - Web: the shared stylesheet and the CSS standard (tokens only), diagram-studio/1 diagrams with Simulate, Reset and speed, a theme picker that only sets `data-theme`.
-- Docker is mock-first (the stub issuer is behind `--profile stub`); app port 4510 (dev server and tests 4760-4769); Node 22; CI on hosted runners (build, test, doctor, forbidden-strings, gitleaks); Learning Hub pack (D1) and shelf entry.
+- Docker is mock-first (the stub issuer is behind `--profile stub`); app port 4510 (dev server and tests 4760-4769); Node 26; CI on hosted runners (build, test, doctor, forbidden-strings, gitleaks); Learning Hub pack (D1) and shelf entry.
 - Imported without history; internal names and a customer-specific slogan were scrubbed.
 
 ## Earlier (before the standalone import)

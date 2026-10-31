@@ -41,9 +41,9 @@ describe('loopback-only', () => {
     expect(read('Dockerfile')).toMatch(/ENV[^\n]*\bHOST=0\.0\.0\.0\b/);
   });
 
-  it('the images run Node 22 and a non-root user, and the app image does not set mock sign-in itself', () => {
+  it('the images run Node 26 and a non-root user, and the app image does not set mock sign-in itself', () => {
     const dockerfile = read('Dockerfile');
-    expect(dockerfile.match(/^FROM node:(\d+)/gm).every((l) => l === 'FROM node:22')).toBe(true);
+    expect(dockerfile.match(/^FROM node:(\d+)/gm).every((l) => l === 'FROM node:26')).toBe(true);
     expect(dockerfile).toMatch(/USER node/);
     expect(dockerfile).not.toMatch(/ALLOW_MOCK_SIGNIN/);
   });

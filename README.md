@@ -16,7 +16,7 @@ Personas: Mark (traveler), Mary (analyst), Priya (approver, travel-agents lead),
 
 ## Run from a clone
 
-Prerequisites: Node 22 or newer, git. Docker only for the Docker form.
+Prerequisites: Node 26 or newer, git. Docker only for the Docker form.
 
 ```sh
 git clone https://github.com/ping-sandbox/privilege-demo-LAB.git
@@ -84,7 +84,7 @@ npm run reset [workspace] # clears one workspace on the running app; sign-ins an
 ```
 
 - `GET /api/health` returns `demo-health/1` (public, GET only, no detail): `state` (`ready`, `needs-setup`, `broken`), `runtime` (`offline` or `live`) and the demo id, name and version.
-- `npm run doctor` checks Node 22, the shared settings file, the configuration, that Cedar loads and every shipped policy validates, the network guard's self-test with zero outbound attempts in mock mode, the health route, a real allow and a real deny, the port, the diagrams, the `{{cast}}` story tokens and the content pack. With `DEMO_MODE=live` it also checks the PingFederate JWKS through the same guard.
+- `npm run doctor` checks Node 26, the shared settings file, the configuration, that Cedar loads and every shipped policy validates, the network guard's self-test with zero outbound attempts in mock mode, the health route, a real allow and a real deny, the port, the diagrams, the `{{cast}}` story tokens and the content pack. With `DEMO_MODE=live` it also checks the PingFederate JWKS through the same guard.
 - `npm run reset [workspace]` (default workspace `default`, or set `WORKSPACE`) restores that workspace's shipped policies and clears its approvals, tool drift and trace. The same reset is `POST /api/workspaces/<id>/reset` from this machine, and `POST /api/reset` for the admin in the page.
 - `scripts/pingfederate-setup.sh` is the family's installer for a local PingFederate (owner-run, needs a licence file the owner hands out; nothing licensed is in this repo).
 
@@ -112,7 +112,7 @@ To point it at a real PingFederate, put its base URL in `PF_URL` (https) and the
 npm test      # server (vitest: Cedar behind a no-network guard, then the app), then web (vitest, jsdom)
 ```
 
-On Node 22: server 448 passed, 0 failed (26 files); web 123 passed, 0 failed (8 files). `npm run doctor` is all ok.
+On Node 26: server 448 passed, 0 failed (26 files); web 123 passed, 0 failed (8 files). `npm run doctor` is all ok.
 Browser stories: `npm run build && npm run e2e` (S04, S01, S23, S05) and `npm run e2e:utility` (the utility pack, light and dark at desktop and 375 px) drive the real UI in Chromium (`npx playwright install chromium`); `npm run check:diagrams` runs the family's label-overlap detector on every diagram at three widths. They are not part of `npm test`.
 
 ## Troubleshooting

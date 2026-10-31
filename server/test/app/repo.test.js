@@ -101,10 +101,10 @@ describe('stories and customer.config', () => {
 
 describe('CI, scripts and what is not shipped', () => {
   const ci = read('.github/workflows/ci.yml');
-  it('CI runs on hosted ubuntu runners with Node 22 only, and has build, test, doctor, forbidden-strings and gitleaks jobs', () => {
+  it('CI runs on hosted ubuntu runners with Node 26 only, and has build, test, doctor, forbidden-strings and gitleaks jobs', () => {
     expect(ci).not.toMatch(/self-hosted|macOS|vars\.RUNS_ON/);
     expect([...ci.matchAll(/runs-on:\s*(.+)/g)].every((m) => m[1].trim() === 'ubuntu-latest')).toBe(true);
-    expect([...ci.matchAll(/node-version:\s*(\d+)/g)].every((m) => m[1] === '22')).toBe(true);
+    expect([...ci.matchAll(/node-version:\s*(\d+)/g)].every((m) => m[1] === '26')).toBe(true);
     expect(ci).toMatch(/actions\/checkout@v5/);
     expect(ci).toMatch(/actions\/setup-node@v5/);
     for (const job of ['build', 'test', 'doctor', 'forbidden-strings', 'gitleaks']) expect(ci, job).toMatch(new RegExp(`^  ${job}:`, 'm'));
@@ -112,8 +112,8 @@ describe('CI, scripts and what is not shipped', () => {
     expect(ci).toMatch(/secrets\.FORBIDDEN_STRINGS/);
     expect(ci).not.toMatch(/echo .*\$FORBIDDEN_STRINGS|cat .*forbidden/); // counts only; the list is never printed
   });
-  it('requires Node 22 everywhere and has no k8s, deploy or hosted-build material', () => {
-    for (const f of ['package.json', 'server/package.json', 'web/package.json']) expect(json(f).engines.node, f).toBe('>=22');
+  it('requires Node 26 everywhere and has no k8s, deploy or hosted-build material', () => {
+    for (const f of ['package.json', 'server/package.json', 'web/package.json']) expect(json(f).engines.node, f).toBe('>=26');
     for (const d of ['k8s', 'deploy']) expect(fs.existsSync(path.join(root, d)), d).toBe(false);
     expect(json('package.json').scripts.start).toBe('node scripts/start.mjs');
   });
