@@ -1,11 +1,12 @@
-// Black-box check of a RUNNING app in PF mode with the local stub issuer (docker compose, or host-run stub + IDP=pf).
-//   BASE_URL=http://localhost:18080 node scripts/smoke.mjs            tokens minted inside the compose stub container
-//   BASE_URL=http://127.0.0.1:8099 MINT=local node scripts/smoke.mjs  tokens minted by a host-run stub (node stub-issuer/server.mjs)
+// Black-box check of a RUNNING app in LIVE mode with the local stub issuer (not PingFederate): docker compose with the stub profile, or a
+// host-run stub (node stub-issuer/server.mjs) with PF_URL pointing at it and DEMO_MODE=live.
+//   BASE_URL=http://127.0.0.1:4510 node scripts/smoke.mjs             tokens minted inside the compose stub container
+//   BASE_URL=http://127.0.0.1:4761 MINT=local node scripts/smoke.mjs  tokens minted by a host-run stub
 // Checks health, the web page, Bearer accept/refuse, and one decision per group x tool cell through POST /mcp.
 // Expectations are written out here on purpose: they come from docs/group-to-tool-mapping.md, not from the app's code.
 import { execFileSync } from 'node:child_process';
 
-const BASE = (process.env.BASE_URL || 'http://localhost:18080').replace(/\/+$/, '');
+const BASE = (process.env.BASE_URL || 'http://127.0.0.1:4510').replace(/\/+$/, '');
 const MINT = process.env.MINT || 'docker';
 
 let failed = 0;
@@ -16,7 +17,7 @@ function mint(persona, extra = []) {
   const args = ['stub-issuer/mint.mjs', persona, ...extra];
   const out = MINT === 'local'
     ? execFileSync('node', args, { encoding: 'utf8' })
-    : execFileSync('docker', ['compose', 'exec', '-T', 'stub-issuer', 'node', ...args], { encoding: 'utf8' });
+    : execFileSync('docker', ['compose', '--profile', 'stub', 'exec', '-T', 'stub-issuer', 'node', ...args], { encoding: 'utf8' });
   return out.trim();
 }
 
@@ -54,16 +55,18 @@ const GROUPS = {
 
 // ---- health and web page ----
 const health = await fetch(`${BASE}/api/health`).then((r) => r.json()).catch(() => null);
-check(health?.ok === true, 'GET /api/health', JSON.stringify(health));
+check(health?.schema === 'demo-health/1' && health?.demo?.id === 'privilege-demo', 'GET /api/health is demo-health/1', JSON.stringify(health));
 const page = await fetch(`${BASE}/`).then((r) => r.text()).catch(() => '');
 const asset = /src="(\/assets\/[^"]+\.js)"/.exec(page)?.[1];
 check(page.includes('id="root"') && Boolean(asset), 'web page loads (index.html with a script bundle)');
 const assetRes = asset ? await fetch(`${BASE}${asset}`) : null;
 check(assetRes?.status === 200, 'web bundle is served', String(assetRes?.status));
+// The stub issuer is for the live path: switch the app to Live (it must already have PF_URL and PF_AUDIENCE pointing at the stub).
+if (health?.runtime !== 'live') await fetch(`${BASE}/api/mode`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ mode: 'live' }) }).catch(() => null);
 const cfg = await fetch(`${BASE}/api/auth/config`).then((r) => r.json()).catch(() => ({}));
-check(cfg.idp === 'pf' && cfg.mockAvailable === false && cfg.bearer === true, 'container is in PF mode with no mock sign-in', JSON.stringify(cfg));
+check(cfg.mode === 'live' && cfg.mockAvailable === false && cfg.bearer === true, 'the app is in live mode with no mock sign-in', JSON.stringify(cfg));
 const mock = await fetch(`${BASE}/api/auth/mock/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ persona: 'mark' }) });
-check(mock.status === 404, 'the mock login route does not exist', String(mock.status));
+check([403, 404].includes(mock.status), 'the mock login is refused in live mode', String(mock.status));
 const pre = await fetch(`${BASE}/api/preflight`).then((r) => r.json()).catch(() => null);
 check(pre?.ok === true, 'GET /api/preflight is all clear', JSON.stringify(pre?.checks?.filter((c) => !c.ok)));
 

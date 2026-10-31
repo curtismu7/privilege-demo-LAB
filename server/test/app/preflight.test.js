@@ -63,7 +63,7 @@ describe('GET /api/preflight', () => {
     expect(text).not.toContain('sentinel-session-secret');
   });
   it('a Bearer token on a server with no PF configured says how to fix it', async () => {
-    const r = await request(mockApp().app).post('/mcp').set(bearer('a.b.c')).send({ jsonrpc: '2.0', id: 1, method: 'ping' });
+    const r = await request(makeApp({ idp: 'pf', host: '0.0.0.0' }).app).post('/mcp').set(bearer('a.b.c')).send({ jsonrpc: '2.0', id: 1, method: 'ping' });
     expect(r.status).toBe(401);
     expect(r.body.reason).toBe('bearer_not_enabled');
     expect(r.body.fix).toContain('PF_URL');

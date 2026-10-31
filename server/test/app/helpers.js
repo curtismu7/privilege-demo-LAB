@@ -20,7 +20,7 @@ export function makeApp(over = {}, opts = {}) {
   return { app, cfg, clock, dataDir };
 }
 
-export const mockApp = (over = {}) => makeApp({ mockSignin: true, host: '127.0.0.1', ...over });
+export const mockApp = (over = {}, opts = {}) => makeApp({ mockSignin: true, host: '127.0.0.1', ...over }, opts);
 
 // A signed-in supertest agent for a persona (cookie jar kept by the agent).
 export async function signedIn(ctx, persona) {
@@ -55,7 +55,7 @@ export async function startStubPf() {
   return { url, mint, wrongKey: other, close: () => new Promise((r) => { server.closeAllConnections(); server.close(r); }) };
 }
 
-export const pfApp = (pf, over = {}) => makeApp({ idp: 'pf', pfUrl: pf.url, pfIssuer: pf.url, pfJwksUrl: `${pf.url}/pf/JWKS`, pfAudience: AUD, clockSkewSec: 30, ...over });
+export const pfApp = (pf, over = {}, opts = {}) => makeApp({ idp: 'pf', pfUrl: pf.url, pfIssuer: pf.url, pfJwksUrl: `${pf.url}/pf/JWKS`, pfAudience: AUD, clockSkewSec: 30, ...over }, opts);
 
 export const bearer = (t) => ({ authorization: `Bearer ${t}` });
 export const rpc = (agent, token, method, params, id = 1) =>

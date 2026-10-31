@@ -1,0 +1,142 @@
+{
+  "schema": "diagram-studio/1",
+  "id": "pd-rug-pull",
+  "title": "A tool changes after approval",
+  "lede": "The server quietly rewrites a tool's description. The pinned hash no longer matches, so policy denies the tool for everyone.",
+  "groups": {
+    "agent": {
+      "label": "The agent and its people",
+      "color": "blue"
+    },
+    "pep": {
+      "label": "Policy enforcement point",
+      "color": "red"
+    },
+    "engine": {
+      "label": "Decision and records",
+      "color": "dark"
+    },
+    "backend": {
+      "label": "Identity and tools",
+      "color": "grey"
+    },
+    "wait": {
+      "label": "Waiting for a person",
+      "color": "amber"
+    }
+  },
+  "nodes": [
+    {
+      "id": "admin",
+      "group": "agent",
+      "label": "Dana (admin)",
+      "sub": [
+        "Demo control: makes a tool's",
+        "description drift"
+      ],
+      "x": 0,
+      "y": 0
+    },
+    {
+      "id": "tool",
+      "group": "backend",
+      "label": "MCP tool server",
+      "sub": [
+        "Advertises the new description",
+        "Also forwards a copy elsewhere"
+      ],
+      "x": 460,
+      "y": 0
+    },
+    {
+      "id": "agent",
+      "group": "agent",
+      "label": "AI agent",
+      "sub": [
+        "Calls the changed tool"
+      ],
+      "x": 0,
+      "y": 320
+    },
+    {
+      "id": "pep",
+      "group": "pep",
+      "label": "Policy enforcement point",
+      "sub": [
+        "Computes the observed hash",
+        "Compares it with the pinned hash"
+      ],
+      "x": 460,
+      "y": 320
+    },
+    {
+      "id": "cedar",
+      "group": "engine",
+      "label": "Cedar engine",
+      "sub": [
+        "s05-rugpull-pin",
+        "forbids a hash mismatch"
+      ],
+      "x": 920,
+      "y": 320
+    }
+  ],
+  "edges": [
+    {
+      "source": "admin",
+      "target": "tool",
+      "label": "Drift the schema"
+    },
+    {
+      "source": "agent",
+      "target": "pep",
+      "label": "tools/call"
+    },
+    {
+      "source": "tool",
+      "target": "pep",
+      "label": "Observed hash",
+      "dashed": true
+    },
+    {
+      "source": "pep",
+      "target": "cedar",
+      "label": "Pinned vs observed"
+    },
+    {
+      "source": "cedar",
+      "target": "pep",
+      "label": "Deny: schema changed"
+    }
+  ],
+  "steps": [
+    {
+      "title": "The tool is pinned",
+      "what": "At onboarding the server's tool schema is hashed and the hash is pinned. The pin is the approved baseline.",
+      "edges": []
+    },
+    {
+      "title": "The description drifts",
+      "what": "The tool server changes its description (a rug pull). The tool's name and the call look the same.",
+      "edges": [
+        0
+      ]
+    },
+    {
+      "title": "The hash is compared",
+      "what": "On the next call the enforcement point hashes what the server advertises now and hands both hashes to Cedar.",
+      "edges": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "title": "Policy denies it",
+      "what": "s05-rugpull-pin forbids a mismatch, with no approver, so no one can wave it through. Reset restores the schema.",
+      "edges": [
+        4
+      ]
+    }
+  ]
+}

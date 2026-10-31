@@ -50,8 +50,8 @@ export default function TestRequest() {
           {TEST_USERS.map((u) => <option key={u.id} value={u.id}>{u.label}</option>)}
         </select>
       </label>
-      <fieldset className="field" style={{ border: 0, padding: 0, margin: "0.5rem 0" }}>
-        <legend className="field" style={{ padding: 0 }}>Token groups</legend>
+      <fieldset className="field field--group">
+        <legend className="field-legend">Token groups</legend>
         <div className="row">
           {GROUPS.map((g) => (
             <label key={g} className="check"><input type="checkbox" checked={groups.includes(g)} onChange={() => toggleGroup(g)} />{g}</label>
@@ -70,7 +70,7 @@ export default function TestRequest() {
       <label className="field">Approvals already given
         <input type="number" min={0} max={100} value={approvalCount} onChange={(e) => setApprovalCount(Math.max(0, Number(e.target.value) || 0))} />
       </label>
-      <div className="row"><button type="button" className="btn primary" onClick={run} disabled={busy || !tool}>Test request</button></div>
+      <div className="row"><button type="button" className="primary" onClick={run} disabled={busy || !tool}>Test request</button></div>
       <div aria-live="polite">
         <ResultCard title="Decision" res={res}>
           {shadow && (

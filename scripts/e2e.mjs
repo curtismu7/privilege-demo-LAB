@@ -1,4 +1,4 @@
-// End-to-end browser run of the stories S04, S01, S05 and S23 against the HOST-RUN app (IDP=local-mock, offline). Run by hand:
+// End-to-end browser run of the stories S04, S01, S05 and S23 against the HOST-RUN app (mock mode, offline). Run by hand:
 //   npm run e2e            (needs: npm install, npm run build, and a Chromium: npx playwright install chromium)
 // It starts the server itself on a free port with a throwaway DATA_DIR, drives it through Playwright, saves screenshots to
 // e2e-output/ and exits 1 on the first broken expectation. It is not part of `npm test` or CI. No network beyond loopback.
@@ -15,14 +15,20 @@ if (!fs.existsSync(path.join(root, 'web/dist/index.html'))) { console.error('web
 let chromium;
 try { ({ chromium } = await import('playwright')); } catch { console.error('playwright is not installed. Fix: npm install'); process.exit(1); }
 
-const freePort = () => new Promise((resolve) => { const s = net.createServer(); s.listen(0, '127.0.0.1', () => { const { port } = s.address(); s.close(() => resolve(port)); }); });
-const port = await freePort(); // never 8080 or 5173 unless the OS hands one out by chance; ephemeral ports are far above
+// Test ports for this app are 4760-4769 only: the first one that is free.
+const freePort = async () => {
+  for (let port = 4760; port <= 4769; port++) {
+    if (await new Promise((resolve) => { const s = net.createServer(); s.once('error', () => resolve(false)); s.listen(port, '127.0.0.1', () => s.close(() => resolve(true))); })) return port;
+  }
+  throw new Error('no free port in 4760-4769');
+};
+const port = await freePort();
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pd-e2e-'));
 fs.writeFileSync(path.join(dataDir, 'ALLOW_ADMIN_PERSONA'), 'on'); // Dana exists for this run only
 fs.rmSync(OUT, { recursive: true, force: true });
 fs.mkdirSync(OUT, { recursive: true });
 
-const env = { PATH: process.env.PATH, HOME: process.env.HOME, IDP: 'local-mock', ALLOW_MOCK_SIGNIN: '1', HOST: '127.0.0.1', PORT: String(port), DATA_DIR: dataDir, NODE_ENV: '' };
+const env = { PATH: process.env.PATH, HOME: process.env.HOME, STANDALONE_ENV: '/nonexistent/none.env', DEMO_MODE: 'mock', ALLOW_MOCK_SIGNIN: '1', HOST: '127.0.0.1', PORT: String(port), DATA_DIR: dataDir, NODE_ENV: '' };
 const server = spawn(process.execPath, ['server/src/index.js'], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] });
 let serverLog = '';
 server.stdout.on('data', (d) => { serverLog += d; });
@@ -36,6 +42,7 @@ for (let i = 0; ; i++) {
 
 let browser;
 const results = [];
+const consoleProblems = []; // every browser console error and uncaught page error, from every page of every user
 const step = async (name, fn) => {
   try { await fn(); results.push([true, name]); console.log(`PASS  ${name}`); } catch (e) { results.push([false, name]); console.log(`FAIL  ${name}\n      ${String(e.message).split('\n')[0]}`); throw e; }
 };
@@ -51,6 +58,8 @@ try {
   const newUser = async (persona, label) => {
     const ctx = await browser.newContext({ viewport: { width: 1200, height: 900 } });
     const page = await ctx.newPage();
+    page.on('console', (m) => { if (m.type() === 'error') consoleProblems.push(`${label}: ${m.text()}`); });
+    page.on('pageerror', (e) => consoleProblems.push(`${label}: uncaught ${e.message}`));
     await page.goto(`${BASE}/`);
     await page.getByRole('button', { name: new RegExp(persona, 'i') }).click();
     await page.getByTestId('shell-user').waitFor();
@@ -62,7 +71,7 @@ try {
   // One call from the Tool console. Reloads the page first so the result card is always the new one.
   async function call(page, tool, args = {}, { dot = false, justification } = {}) {
     await page.goto(`${BASE}/console`);
-    await page.locator('select').first().selectOption(tool);
+    await page.locator('#main select').first().selectOption(tool);
     for (const [k, v] of Object.entries(args)) await page.locator('label.field', { hasText: new RegExp(`^${k}`) }).locator('input').fill(String(v));
     if (dot) await page.getByLabel(/Dot \(Mark's agent\)/).check();
     if (justification) await page.locator('label.field', { hasText: /^Justification/ }).locator('input').fill(justification);
@@ -171,6 +180,20 @@ try {
       await shot(dana.page, `page-${h.toLowerCase()}`);
     }
     await dana.ctx.close();
+  });
+
+  // ---- the browser console stays clean: a Deny, a refused Live switch and a signed-out load are normal results, not errors ----
+  await step('the browser console had no errors (Allow, Hold, Deny, approvals, drift, every page)', async () => {
+    const anon = await browser.newContext({ viewport: { width: 1200, height: 900 } });
+    const page = await anon.newPage();
+    page.on('console', (m) => { if (m.type() === 'error') consoleProblems.push(`signed out: ${m.text()}`); });
+    page.on('pageerror', (e) => consoleProblems.push(`signed out: uncaught ${e.message}`));
+    for (const p of ['/', '/policies', '/console', '/approvals', '/trace', '/learn', '/diagram']) { await page.goto(`${BASE}${p}`); await page.waitForLoadState('networkidle'); }
+    await page.goto(`${BASE}/`);
+    await page.getByRole('button', { name: 'Live' }).click();
+    await page.getByRole('alert').waitFor(); // the fix text is shown
+    await anon.close();
+    if (consoleProblems.length) throw new Error(`${consoleProblems.length} console problem(s), first: ${consoleProblems[0]}`);
   });
 } catch (e) {
   console.log(`\nStopped at the first failure: ${e.message}`);

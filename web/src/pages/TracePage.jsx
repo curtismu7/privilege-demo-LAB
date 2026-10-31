@@ -21,7 +21,7 @@ function Trace() {
       <p className="lede">One row per hop, newest first: who, which product, the decision and the rule that made it, and how long it took. Tokens never appear here.</p>
       <PageStories page="trace" />
       <div className="row">
-        <button type="button" className="btn" onClick={load}>Refresh</button>
+        <button type="button" onClick={load}>Refresh</button>
         <label className="check">Request
           <select value={only} onChange={(e) => setOnly(e.target.value)}>
             <option value="">All requests</option>
@@ -32,12 +32,12 @@ function Trace() {
       {events === null ? <p role="status">Loading…</p> : shown.length === 0 ? <p className="card">No hops yet. Make a call in the <a href="/console">Tool console</a>.</p> : (
         <ol className="timeline" aria-label="Hops, newest first">
           {shown.map((e) => (
-            <li key={`${e.trace_id}-${e.span_id}`}>
-              <span className="meta mono">{new Date(e.ts).toLocaleTimeString()}</span>
+            <li key={`${e.trace_id}-${e.span_id}`} className="timeline__item">
+              <span className="timeline__meta mono">{new Date(e.ts).toLocaleTimeString()}</span>
               <span>
                 <strong>{e.hop}</strong> <span className="muted">({e.product})</span> <Badge kind={e.decision.result} />{" "}
                 <code>{e.decision.rule}</code> {e.decision.reason}
-                <span className="meta"> · {e.subject ?? "no subject"}{e.actor ? ` via ${e.actor.sub}` : ""}{e.tool ? <> · tool <code>{e.tool}</code></> : ""} · {Math.round(e.latency_ms)} ms · request <code>{short(e.trace_id)}</code></span>
+                <span className="timeline__meta"> · {e.subject ?? "no subject"}{e.actor ? ` via ${e.actor.sub}` : ""}{e.tool ? <> · tool <code>{e.tool}</code></> : ""} · {Math.round(e.latency_ms)} ms · request <code>{short(e.trace_id)}</code></span>
               </span>
             </li>
           ))}

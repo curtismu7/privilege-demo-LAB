@@ -1,10 +1,10 @@
 # Architecture
 
-One Node process (Express, ESM) serves the API, the mock MCP backend and the built web app. There is no database: policies and the audit log are files under `DATA_DIR`; approvals, sessions and the trace buffer are in memory.
+One Node process (Express, ESM) serves the API, the mock MCP backend and the built web app. There is no database: policies and the audit log are files under `DATA_DIR`; approvals, sessions and the trace buffer are in memory. All of that state is per workspace (`X-Workspace`, default `default`). The app is in Mock mode (the default: an in-process mock issuer, no network) or Live mode (PingFederate's JWKS), and the header toggle switches it.
 
 ```
  AI agent / person
-        |  Bearer <PingFederate access token>   (or, host-run only, a persona cookie)
+        |  Bearer <access token>: PingFederate (live) or the in-process mock issuer (mock), or a persona cookie (mock only)
         v
  +------------------------ privilege-demo server ------------------------+
  |  authenticate  ->  PEP enforce()  ->  Cedar decide()  ->  allow | deny | hold
@@ -19,8 +19,11 @@ One Node process (Express, ESM) serves the API, the mock MCP backend and the bui
 
 | Piece | File | Job |
 |---|---|---|
-| Authentication | `server/src/auth/pf.js` | Verify the Bearer token with `jose` against the PingFederate JWKS: issuer, audience, `exp`/`nbf`, RS256 or ES256 only, clock skew capped at 60 s, `groups` required. Reasons are fixed codes; nothing from the token is echoed. |
-| Mock sign-in | `server/src/auth/guards.js`, `personas.js` | Host-run offline persona picker. See [security.md](security.md). |
+| Authentication | `server/src/auth/pf.js`, `server/src/mockIdp.js` | Verify the Bearer token with `jose` against the PingFederate JWKS (live) or the mock issuer's public key (mock): issuer, audience, `exp`/`nbf`, RS256 or ES256 only, clock skew capped at 60 s, `groups` required. Reasons are fixed codes; nothing from the token is echoed. |
+| Mock sign-in | `server/src/auth/guards.js`, `personas.js` | Offline persona picker, Mock mode only. See [security.md](security.md). |
+| Network guard | `server/src/netguard.js` | The only door out: nothing in Mock mode, only the configured PingFederate in Live mode. |
+| Workspaces | `server/src/workspaces.js` | One policy store, approvals, drift, trace and audit per workspace id; reset clears one. |
+| Settings | `server/src/settings.js` | The shared `~/Development/.env` loader (allowlisted keys only). |
 | PEP | `server/src/pep.js` | `enforce()` is the only path to a tool. It checks arguments against the tool schema, calls Cedar, then runs the tool (allow), refuses (deny) or creates an approval (hold). |
 | Cedar module | `server/src/cedar/` | Pure `decide()`; fails closed. See its [README](../server/src/cedar/README.md). |
 | Policy store | `server/src/policyStore.js` | Active and Candidate policies as files; a set that does not validate is never installed. |

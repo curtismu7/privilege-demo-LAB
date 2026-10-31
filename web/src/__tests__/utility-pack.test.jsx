@@ -145,7 +145,7 @@ describe("pages in the utility pack", () => {
     expect(screen.getByRole("checkbox", { name: /Delivery agent/ })).toBeChecked();
     fireEvent.click(screen.getByRole("button", { name: /Call as Eli/ }));
     await screen.findByText("On behalf of");
-    expect(calls.find((c) => c.url === "/api/tools/call").body).toEqual({ tool: "github.read_pr", args: { repo: "grid-ops-portal", pr: 42 }, asAgent: true });
+    expect(calls.find((c) => c.url === "/api/tools/call?envelope=1").body).toEqual({ tool: "github.read_pr", args: { repo: "grid-ops-portal", pr: 42 }, asAgent: true });
     expect(screen.getByText("On behalf of").nextSibling).toHaveTextContent("user eli via agent delivery-agent · tool github.read_pr");
     fireEvent.change(screen.getByLabelText("Tool"), { target: { value: "kb.search" } });
     expect(screen.getByLabelText("collection")).toHaveValue("runbooks");

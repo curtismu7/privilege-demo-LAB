@@ -29,7 +29,7 @@ function Approvals() {
       <h1>Approvals</h1>
       <p className="lede">Calls the policies held for a person. Approving re-checks the call against the current policies and runs it once.</p>
       <PageStories page="approvals" />
-      <div className="row"><button type="button" className="btn" onClick={load}>Refresh</button><span className="muted">Updates every few seconds.</span></div>
+      <div className="row"><button type="button" onClick={load}>Refresh</button><span className="muted">Updates every few seconds.</span></div>
       <p role="status" className="muted">{message}</p>
       {items === null ? <p role="status">Loading…</p> : items.length === 0 ? (
         <p className="card">Nothing waiting. Make a held call in the <a href="/console">Tool console</a>: {pack.approvalsHint ?? "book_fare, amount 2400, with Dot making the call."}</p>
@@ -50,8 +50,8 @@ function Approvals() {
               {a.outcome?.result && <pre className="result__body" aria-label="Tool result">{JSON.stringify(a.outcome.result, null, 2)}</pre>}
               {mayDecide(a) ? (
                 <div className="row">
-                  <button type="button" className="btn primary" onClick={() => decide(a, "approve")}>Approve {a.tool}</button>
-                  <button type="button" className="btn" onClick={() => decide(a, "deny")}>Deny {a.tool}</button>
+                  <button type="button" className="primary" onClick={() => decide(a, "approve")}>Approve {a.tool}</button>
+                  <button type="button" onClick={() => decide(a, "deny")}>Deny {a.tool}</button>
                 </div>
               ) : a.status === "pending" && (
                 <p className="muted">{a.requester.sub === me.sub ? "You asked for this; someone else has to answer it." : "Only the named approvers can answer this."}</p>

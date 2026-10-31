@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { PERSONAS, api } from "../api";
 import { useSession } from "../session";
 import { usePack } from "../pack";
+import { useCastName } from "../customer";
 import PreflightCard from "../components/PreflightCard";
 
 const PERSONA_LINES = {
@@ -11,10 +12,19 @@ const PERSONA_LINES = {
   dana: "Admin in admins. Edits policies, makes a tool drift.",
 };
 
+const MOCK_REFUSALS = {
+  disabled: "Set ALLOW_MOCK_SIGNIN=1 to allow it (npm start does, on a loopback bind; docker-compose.yml does), then restart.",
+  non_loopback_listener: "The app is listening on a non-loopback address, so the persona picker is refused. Run it on 127.0.0.1.",
+  non_loopback_connection: "This request did not come from this machine.",
+  proxy_header: "This request came through a proxy (it carries forwarding headers), so the persona picker is refused.",
+  non_loopback_host: "This page was reached by a name that is not loopback.",
+};
+
 /** Sign-in. Host-run offline mock: a persona picker. Server in pf mode: Bearer token guidance. */
 export default function HomePage() {
   const { status, me, config, signIn } = useSession();
   const pack = usePack();
+  const castName = useCastName();
   const [personas, setPersonas] = useState(null);
   const [problem, setProblem] = useState("");
 
@@ -41,16 +51,16 @@ export default function HomePage() {
       {me ? (
         <section className="card" aria-label="Signed in">
           <h2>You are signed in</h2>
-          <p>{me.name ?? PERSONAS[me.persona]?.name ?? me.sub}, groups: {me.groups.join(", ") || "none"}{me.source === "bearer" ? " (Bearer token)" : ""}.</p>
+          <p>{castName(me.persona, me.name ?? PERSONAS[me.persona]?.name ?? me.sub)}, groups: {me.groups.join(", ") || "none"}{me.source === "bearer" ? " (Bearer token)" : ""}.</p>
           <p className="muted">Next: the <a href="/console">Tool console</a> to make a call, <a href="/policies">AI Policies</a> to read or test the rules, <a href="/learn">Learn</a> for the stories.</p>
         </section>
       ) : config?.mockAvailable ? (
         <section className="card" aria-labelledby="pick-h">
           <h2 id="pick-h">Pick a persona</h2>
-          <p className="muted">Offline mock sign-in for a host-run demo. No password, no network.</p>
+          <p className="muted">Offline mock sign-in. No password, no network. Mock mode only.</p>
           {(personas ?? (pack.personas ?? Object.keys(PERSONAS).map((id) => ({ id, ...PERSONAS[id] }))).filter((p) => p.id !== "dana")).map((p) => (
-            <button key={p.id} type="button" className="btn persona" onClick={() => pick(p.id)}>
-              <span><strong>{p.name}</strong> <span className="muted">{(pack.personas ?? []).find((x) => x.id === p.id)?.line ?? PERSONA_LINES[p.id]}</span></span>
+            <button key={p.id} type="button" className="persona-button" onClick={() => pick(p.id)}>
+              <span><strong>{castName(p.id, p.name)}</strong> <span className="muted">{(pack.personas ?? []).find((x) => x.id === p.id)?.line ?? PERSONA_LINES[p.id]}</span></span>
               <span aria-hidden="true">Sign in</span>
             </button>
           ))}
@@ -59,16 +69,21 @@ export default function HomePage() {
           )}
           {problem && <p role="alert" className="problems">{problem}</p>}
           <ul className="guards" aria-label="Mock sign-in guards">
-            <li>Mock sign-in is on only for this loopback, host-run server.</li>
-            <li>Docker containers never offer it.</li>
+            <li>Mock sign-in works only on this machine: a loopback listener (or a port Docker publishes on 127.0.0.1 only), no proxy headers, a loopback Host.</li>
+            <li>It is refused in Live mode.</li>
           </ul>
+        </section>
+      ) : config?.mode === "mock" ? (
+        <section className="card" aria-labelledby="off-h">
+          <h2 id="off-h">Mock sign-in is off</h2>
+          <p>{MOCK_REFUSALS[config.mockRefusal] ?? "Mock sign-in is not available for this request."}</p>
         </section>
       ) : (
         <section className="card" aria-labelledby="bearer-h">
           <h2 id="bearer-h">Bearer token</h2>
-          <p>This server verifies PingFederate access tokens{config?.bearer ? "" : " (not configured here)"}. There is no mock persona picker in this mode.</p>
+          <p>Live mode: this server verifies PingFederate access tokens{config?.bearer ? "" : " (not configured here)"}. There is no persona picker in this mode.</p>
           <p>Send the token as <code>Authorization: Bearer &lt;access token&gt;</code> to <code>POST /mcp</code> or the <code>/api</code> routes. The token's <code>groups</code> claim decides what the policies allow. This page never asks for or stores a token.</p>
-          <p className="muted">To use this web UI with a persona, run the server on your own machine with <code>IDP=local-mock</code> and <code>ALLOW_MOCK_SIGNIN=1</code>.</p>
+          <p className="muted">To use this web UI with a persona, switch the header to Mock.</p>
         </section>
       )}
     </main>

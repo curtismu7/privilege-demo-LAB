@@ -1,27 +1,40 @@
 // Environment settings, read at call time so tests can change process.env. No secrets are logged.
-// Single-tenant by design: one policy store, one approval queue, one trace buffer per process (no workspace ids).
+// One policy store, one approval queue and one trace buffer per workspace (see workspaces.js); the workspace id defaults to "default".
 import path from 'node:path';
 import { PACKS } from './packs/index.js';
 
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1', '[::1]']);
+export const DEFAULT_PORT = 4510;
+export const MODES = ['mock', 'live'];
+const HOSTNAME = /^(?=.{1,253}$)[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$/i;
 
 export function config() {
   const env = process.env;
-  const idp = env.IDP || 'local-mock'; // local-mock | pf
+  // DEMO_MODE (or MODE, when it says mock or live: Vitest and other tools set MODE to unrelated words, which are ignored).
+  const modeRaw = env.DEMO_MODE || (['mock', 'live'].includes(env.MODE) ? env.MODE : 'mock');
+  const mode = modeRaw === 'live' ? 'live' : 'mock';
   const dataDir = env.DATA_DIR || '.data';
   const num = (v, d) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : d);
+  const port = Number(env.PORT) || DEFAULT_PORT;
   return {
-    port: Number(env.PORT) || 8080,
-    // Loopback by default in every mode. A container sets HOST=0.0.0.0 itself (Dockerfile) and compose publishes on 127.0.0.1 only.
+    port,
+    // Loopback by default. A container sets HOST=0.0.0.0 itself (Dockerfile) and compose publishes on 127.0.0.1 only (LAB_PUBLISH=loopback).
     host: env.HOST || '127.0.0.1',
-    appOrigin: env.APP_ORIGIN || `http://localhost:${Number(env.PORT) || 8080}`,
+    publish: env.LAB_PUBLISH === 'loopback' ? 'loopback' : '',
+    // Extra host names (comma separated) the app answers to besides 127.0.0.1, localhost and [::1].
+    allowedHosts: String(env.LAB_ALLOWED_HOSTS || '').split(',').map((h) => h.trim().toLowerCase()).filter(Boolean),
+    appOrigin: env.APP_ORIGIN || `http://localhost:${port}`,
     nodeEnv: env.NODE_ENV || '',
     dataDir,
-    idp,
+    // DEMO_MODE: mock (default, everything in process) or live (Bearer tokens from the PingFederate named by PF_URL). The page toggles it at run time.
+    modeRaw,
+    mode,
+    // Kept for the code that already reads it: local-mock = mock mode, pf = live mode.
+    idp: mode === 'live' ? 'pf' : 'local-mock',
     // Vertical pack: personas, tools, Cedar schema and shipped policies. generic = the original demo, unchanged.
     pack: env.PACK || 'generic',
-    // Mock sign-in needs BOTH switches. The literal "1" only; "true" does not count.
-    mockSignin: idp === 'local-mock' && env.ALLOW_MOCK_SIGNIN === '1',
+    // Mock sign-in is allowed only by the literal "1" (rule 11). It still needs a loopback bind, no proxy and mock mode, per request.
+    mockSignin: env.ALLOW_MOCK_SIGNIN === '1',
     adminSwitchFile: env.ADMIN_SWITCH_FILE || path.join(dataDir, 'ALLOW_ADMIN_PERSONA'),
     sessionSecret: env.SESSION_SECRET || '',
     sessionTtlMs: num(env.SESSION_TTL_MS, 8 * 3600 * 1000),
@@ -38,28 +51,29 @@ export function config() {
 
 export const isLoopbackHost = (h) => LOOPBACK_HOSTS.has(String(h).toLowerCase());
 
+// What live mode still needs (empty = live mode can be used). Used by the startup check and by the Mock/Live toggle.
+export function liveProblems(c = config()) {
+  const p = [];
+  if (!c.pfUrl) p.push('live mode needs PF_URL');
+  if (!c.pfAudience) p.push('live mode needs PF_AUDIENCE');
+  for (const u of [c.pfIssuer, c.pfJwksUrl]) {
+    if (!u) continue;
+    let parsed;
+    try { parsed = new URL(u); } catch { p.push('PF_URL / PF_JWKS_URL must be absolute URLs'); continue; }
+    const plainOk = parsed.protocol === 'http:' && (isLoopbackHost(parsed.hostname) || (c.pfHttpHosts ?? []).includes(parsed.hostname.toLowerCase()));
+    if (parsed.protocol !== 'https:' && !plainOk) p.push('PF_URL and the JWKS URL must be https (http only for loopback)');
+  }
+  return [...new Set(p)];
+}
+
 // Everything that must stop the process at startup. index.js prints these and exits 1.
 export function startupProblems(c = config()) {
   const p = [];
-  const prod = c.nodeEnv === 'production';
-  if (prod && (c.idp === 'local-mock' || process.env.ALLOW_MOCK_SIGNIN === '1')) {
-    p.push('mock sign-in is not allowed when NODE_ENV=production (set IDP=pf and ALLOW_MOCK_SIGNIN=0)');
-  }
-  if (c.mockSignin && !isLoopbackHost(c.host)) p.push('mock sign-in needs a loopback listener (HOST=127.0.0.1)');
-  if (!['local-mock', 'pf'].includes(c.idp)) p.push('IDP must be local-mock or pf');
+  // NODE_ENV is not a guard (the Docker image sets it). A non-loopback bind is allowed only when compose says the port is published on 127.0.0.1 only.
+  if (c.mockSignin && !isLoopbackHost(c.host) && c.publish !== 'loopback') p.push('mock sign-in needs a loopback listener (HOST=127.0.0.1)');
+  if (c.modeRaw !== undefined && !MODES.includes(c.modeRaw)) p.push('DEMO_MODE must be mock or live');
+  for (const h of c.allowedHosts ?? []) if (!HOSTNAME.test(h)) p.push('LAB_ALLOWED_HOSTS must be host names');
   if (c.pack !== undefined && !Object.hasOwn(PACKS, c.pack)) p.push(`PACK must be one of ${Object.keys(PACKS).join(', ')}`);
-  if (c.idp === 'pf') {
-    if (!c.pfUrl) p.push('IDP=pf needs PF_URL');
-    if (!c.pfAudience) p.push('IDP=pf needs PF_AUDIENCE');
-    for (const u of [c.pfIssuer, c.pfJwksUrl]) {
-      if (!u) continue;
-      let parsed;
-      try { parsed = new URL(u); } catch { p.push('PF_URL / PF_JWKS_URL must be absolute URLs'); continue; }
-      const plainOk = parsed.protocol === 'http:' && (isLoopbackHost(parsed.hostname) || (c.pfHttpHosts ?? []).includes(parsed.hostname.toLowerCase()));
-      if (parsed.protocol !== 'https:' && !plainOk) {
-        p.push('PF_URL and the JWKS URL must be https (http only for loopback)');
-      }
-    }
-  }
+  if (c.idp === 'pf') p.push(...liveProblems(c));
   return [...new Set(p)];
 }

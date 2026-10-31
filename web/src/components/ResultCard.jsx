@@ -6,7 +6,7 @@ export default function ResultCard({ title, res, children }) {
   const outcome = res.outcome ?? res.decision;
   const overridden = res.overridden ?? [];
   return (
-    <section className={`result result-${outcome}`} aria-label={title}>
+    <section className="result" data-state={outcome} aria-label={title}>
       <h3 className="result__head">{title} <Badge kind={outcome} /></h3>
       <dl className="result__facts">
         <dt>Deciding policy</dt><dd><code>{res.rule}</code></dd>
