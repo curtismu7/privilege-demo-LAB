@@ -1,4 +1,4 @@
-// End-to-end browser run of the stories S04, S01, S05 and S23 against the HOST-RUN app (IDP=local-mock, offline). Run by hand:
+// End-to-end browser run of the stories S04, S01, S05 and S23 against the HOST-RUN app (mock mode, offline). Run by hand:
 //   npm run e2e            (needs: npm install, npm run build, and a Chromium: npx playwright install chromium)
 // It starts the server itself on a free port with a throwaway DATA_DIR, drives it through Playwright, saves screenshots to
 // e2e-output/ and exits 1 on the first broken expectation. It is not part of `npm test` or CI. No network beyond loopback.

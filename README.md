@@ -112,8 +112,8 @@ To point it at a real PingFederate, put its base URL in `PF_URL` (https) and the
 npm test      # server (vitest: Cedar behind a no-network guard, then the app), then web (vitest, jsdom)
 ```
 
-On Node 22: server 444 passed, 0 failed (25 files); web 123 passed, 0 failed (8 files). `npm run doctor` is all ok.
-Browser stories: `npm run build && npm run e2e` (S04, S01, S23, S05) and `npm run e2e:utility` (the utility pack, light and dark at desktop and 375 px) drive the real UI in Chromium (`npx playwright install chromium`); they are not part of `npm test`.
+On Node 22: server 448 passed, 0 failed (26 files); web 123 passed, 0 failed (8 files). `npm run doctor` is all ok.
+Browser stories: `npm run build && npm run e2e` (S04, S01, S23, S05) and `npm run e2e:utility` (the utility pack, light and dark at desktop and 375 px) drive the real UI in Chromium (`npx playwright install chromium`); `npm run check:diagrams` runs the family's label-overlap detector on every diagram at three widths. They are not part of `npm test`.
 
 ## Troubleshooting
 
@@ -139,4 +139,4 @@ Browser stories: `npm run build && npm run e2e` (S04, S01, S23, S05) and `npm ru
 
 ## Ownership
 
-Owner: the Ping demo family owner. Licence: internal Ping demo use (see LICENSE); Cedar and `@cedar-policy/cedar-wasm` are Apache-2.0. Report problems on the repository's issues, or to the owner.
+Owner: the Ping demo family owner. Licence: private and unlicensed, for internal Ping demo use (see LICENSE); Cedar and `@cedar-policy/cedar-wasm` are Apache-2.0. Report problems on the repository's issues, or to the owner.

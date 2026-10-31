@@ -23,7 +23,8 @@
     "smoke": "node scripts/smoke.mjs",
     "e2e:utility": "node scripts/e2e-utility.mjs",
     "reset": "node scripts/reset.mjs",
-    "check:ui": "bash scripts/check-ui-standard.sh"
+    "check:ui": "bash scripts/check-ui-standard.sh",
+    "check:diagrams": "node scripts/check-diagrams.mjs"
   },
   "devDependencies": {
     "playwright": "1.58.2"

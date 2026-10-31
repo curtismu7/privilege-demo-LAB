@@ -22,7 +22,7 @@ it says mock or live; shared-file key `PRIVILEGE_DEMO_MODE`), default mock.
 - `npm install`, `npm run build`, `npm start` (127.0.0.1:4510), `npm run doctor`, `npm run reset [workspace]`.
 - `npm test`: server (`vitest run`, Cedar wasm, slow on first import: 30 s test timeout), then web (vitest, jsdom).
   The server tests are vitest suites under `server/test/app` and `server/test/cedar` (cedar runs behind a no-network guard).
-- `npm run e2e` and `npm run e2e:utility` drive the real UI in Chromium (ports 4760-4769, throwaway DATA_DIR). `npm run smoke` checks a
+- `npm run check:diagrams` (label overlap, every diagram, three widths), `npm run e2e` and `npm run e2e:utility` drive the real UI in Chromium (ports 4760-4769, throwaway DATA_DIR). `npm run smoke` checks a
   running live-mode app against the local stub issuer.
 - Docker: `docker compose up --build -d` -> http://127.0.0.1:4510 (mock). Live: set `PF_URL`, `PF_AUDIENCE`, `DEMO_MODE=live`.
 - Node 22 (owner decision 2026-10-31): Dockerfile, CI and `engines` say 22.

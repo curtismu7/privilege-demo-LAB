@@ -1,4 +1,4 @@
-// Browser run of the utility / NERC CIP-style pack (PACK=utility) on the HOST-RUN app (IDP=local-mock, offline). Run by hand:
+// Browser run of the utility / NERC CIP-style pack (PACK=utility) on the HOST-RUN app (mock mode, offline). Run by hand:
 //   npm run build && npm run e2e:utility        (needs a Chromium: npx playwright install chromium, or Google Chrome)
 // Starts the server itself (default port 4762, E2E_PORT to change; never a port in use) with a throwaway DATA_DIR, drives the five
 // pack stories in a real browser, then sweeps every page in light and dark at desktop and 375 px (no sideways scroll, the

@@ -32,6 +32,7 @@
 .mode-toggle__problem { margin: 0; max-width: 28rem; padding: 4px 8px; border-radius: 6px; background: var(--surface); color: var(--danger-text); font-size: 12px; font-weight: 600; }
 
 /* ---- page ---- */
+a, a:visited { color: var(--status-info); }
 .page { max-width: 72rem; margin: 24px auto; min-width: 0; }
 .page h1 { margin: 0 0 4px; font-size: 24px; }
 .page h2 { margin: 0 0 8px; font-size: 17px; }

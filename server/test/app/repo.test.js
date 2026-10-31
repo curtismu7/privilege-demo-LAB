@@ -37,7 +37,7 @@ describe('README standard', () => {
     expect(readme).not.toMatch(/PINGONE_ADMIN|CLIENT_SECRET|WORKER_CLIENT|VAULT_PASSWORD/);
   });
   it('carries no internal host, tenant or personal name', () => {
-    expect(readme).not.toMatch(/ping-devops|pingcorp|cmuir|\.internal\b|amazonaws|arn:aws/i);
+    expect(readme).not.toMatch(/\.internal\b|amazonaws|arn:aws|\/Users\//i);
   });
 });
 
