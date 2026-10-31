@@ -25,7 +25,7 @@ it says mock or live; shared-file key `PRIVILEGE_DEMO_MODE`), default mock.
 - `npm run check:diagrams` (label overlap, every diagram, three widths), `npm run e2e` and `npm run e2e:utility` drive the real UI in Chromium (ports 4760-4769, throwaway DATA_DIR). `npm run smoke` checks a
   running live-mode app against the local stub issuer.
 - Docker: `docker compose up --build -d` -> http://127.0.0.1:4510 (mock). Live: set `PF_URL`, `PF_AUDIENCE`, `DEMO_MODE=live`.
-- Node 26 (owner decision 2026-10-31): Dockerfile, CI, `engines` (>=26) and the doctor check all say 26; there is no Node 22 or 24 support.
+- Node 26 (owner decision 2026-10-31): Dockerfile, CI, `engines` (>=26) and the doctor check all say 26; no older Node version is supported.
 
 ## Rules that bite
 
