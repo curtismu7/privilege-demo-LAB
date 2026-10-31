@@ -211,7 +211,7 @@ describe("Tool console", () => {
     const card = await screen.findByRole("region", { name: "PEP decision" });
     expect(within(card).getByText("Deny")).toBeInTheDocument();
     expect(within(card).getByText("default-deny")).toBeInTheDocument();
-    expect(calls.find((c) => c.url === "/api/tools/call").body).toEqual({ tool: "pay_invoice", args: { invoiceId: "INV-1001", amount: 250 } });
+    expect(calls.find((c) => c.url === "/api/tools/call?envelope=1").body).toEqual({ tool: "pay_invoice", args: { invoiceId: "INV-1001", amount: 250 } });
   });
 
   it("sends asAgent and the justification, and links a hold to Approvals", async () => {
@@ -225,7 +225,7 @@ describe("Tool console", () => {
     const card = await screen.findByRole("region", { name: "PEP decision" });
     expect(within(card).getByText("Hold")).toBeInTheDocument();
     expect(within(card).getByRole("link", { name: "Open Approvals" })).toHaveAttribute("href", "/approvals");
-    expect(calls.find((c) => c.url === "/api/tools/call").body).toEqual({ tool: "book_fare", args: { flightId: "FL200", amount: 2400 }, asAgent: true, justification: "client dinner" });
+    expect(calls.find((c) => c.url === "/api/tools/call?envelope=1").body).toEqual({ tool: "book_fare", args: { flightId: "FL200", amount: 2400 }, asAgent: true, justification: "client dinner" });
   });
 
   it("shows an allow with the tool result", async () => {

@@ -112,8 +112,8 @@ To point it at a real PingFederate, put its base URL in `PF_URL` (https) and the
 npm test      # server (vitest: Cedar behind a no-network guard, then the app), then web (vitest, jsdom)
 ```
 
-On Node 26: server 448 passed, 0 failed (26 files); web 123 passed, 0 failed (8 files). `npm run doctor` is all ok.
-Browser stories: `npm run build && npm run e2e` (S04, S01, S23, S05) and `npm run e2e:utility` (the utility pack, light and dark at desktop and 375 px) drive the real UI in Chromium (`npx playwright install chromium`); `npm run check:diagrams` runs the family's label-overlap detector on every diagram at three widths. They are not part of `npm test`.
+On Node 26: server 452 passed, 0 failed (26 files); web 124 passed, 0 failed (8 files). `npm run doctor` is all ok.
+Browser stories: `npm run build && npm run e2e` (S04, S01, S23, S05, and a check that the browser console has no errors) and `npm run e2e:utility` (the utility pack, light and dark at desktop and 375 px) drive the real UI in Chromium (`npx playwright install chromium`); `npm run check:diagrams` runs the family's label-overlap detector on every diagram at three widths. They are not part of `npm test`.
 
 ## Troubleshooting
 

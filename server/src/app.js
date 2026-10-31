@@ -178,9 +178,10 @@ export function createApp({ cfg = config(), now = () => Date.now(), fetchImpl = 
     (isAdmin(req.principal.claims) ? handler(req, res) : res.status(403).json({ error: 'admin_only' })));
 
   // ---- mode, config, preflight ----
+  const liveFix = () => (liveReady() ? {} : { liveFix: 'Set PF_URL and PF_AUDIENCE in ~/Development/.env (or the file STANDALONE_ENV names), then restart. Mock mode needs nothing.' });
   const modeView = (req) => ({
     mode: mode(), liveReady: liveReady(),
-    ...(liveReady() ? {} : { liveFix: 'Set PF_URL and PF_AUDIENCE in ~/Development/.env (or the file STANDALONE_ENV names), then restart. Mock mode needs nothing.' }),
+    ...liveFix(),
     mockSignIn: { allowed: !mockRequestRefusal(req, cfg, 'mock'), refusal: mockRequestRefusal(req, cfg, 'mock') },
   });
   app.get('/api/mode', (req, res) => res.json(modeView(req)));
@@ -195,7 +196,7 @@ export function createApp({ cfg = config(), now = () => Date.now(), fetchImpl = 
   });
   app.get('/api/preflight', wrap(async (req, res) => res.json(await preflight(wsOf(req).store))));
   app.get('/api/auth/config', (req, res) => res.json({
-    idp: mode() === 'live' ? 'pf' : 'local-mock', mode: mode(), liveReady: liveReady(), workspace: req.workspaceId,
+    idp: mode() === 'live' ? 'pf' : 'local-mock', mode: mode(), liveReady: liveReady(), ...liveFix(), workspace: req.workspaceId,
     mockAvailable: !mockRefusal(req), mockRefusal: mockRefusal(req), bearer: mode() === 'live' ? Boolean(verifyPf) : true, pack: publicPack(pack),
     customer: publicConfig(customer),
   }));
@@ -227,9 +228,12 @@ export function createApp({ cfg = config(), now = () => Date.now(), fetchImpl = 
   }
   app.post('/api/auth/logout', (req, res) => { res.set('set-cookie', sessions.cookie('', 0, req.workspaceId)); res.json({ ok: true }); });
 
-  app.get('/api/me', authed({}, (req, res) => {
-    const { claims, source, persona } = req.principal;
-    res.json({ sub: claims.sub, groups: claims.groups ?? [], scope: claims.scope ?? '', isAdmin: isAdmin(claims), source, persona: persona ?? null, ...(pack.web && persona ? { name: PERSONAS[persona]?.name } : {}) });
+  const meView = ({ claims, source, persona }) => ({ sub: claims.sub, groups: claims.groups ?? [], scope: claims.scope ?? '', isAdmin: isAdmin(claims), source, persona: persona ?? null, ...(pack.web && persona ? { name: PERSONAS[persona]?.name } : {}) });
+  app.get('/api/me', authed({}, (req, res) => res.json(meView(req.principal))));
+  // The same answer for the web app, but "nobody is signed in" is a normal 200 with me: null, so the browser console stays clean.
+  app.get('/api/session', wrap(async (req, res) => {
+    const a = await authenticate(req, {});
+    res.json({ me: a.ok ? meView(a) : null });
   }));
 
   app.get('/api/tools', authed({}, (req, res) => {
@@ -251,7 +255,8 @@ export function createApp({ cfg = config(), now = () => Date.now(), fetchImpl = 
     const claims = asAgent === true ? { ...req.principal.claims, act: { sub: AGENT.sub } } : req.principal.claims;
     const out = wsOf(req).pep.enforce({ claims, tool, args: args ?? {}, source: req.principal.source, traceparent: req.principal.traceparent, justification });
     res.set('traceparent', out.traceparent);
-    return res.status(STATUS[out.outcome]).json(publicOutcome(out));
+    // ?envelope=1 (the web console): always 200 with the outcome in the body, because a Deny is a result and not a failed request.
+    return res.status(req.query.envelope === '1' ? 200 : STATUS[out.outcome]).json(publicOutcome(out));
   }));
 
   app.post('/mcp', wrap(async (req, res) => {

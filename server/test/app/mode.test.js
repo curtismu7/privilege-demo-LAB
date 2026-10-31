@@ -35,6 +35,11 @@ describe('the Mock/Live toggle (PUT /api/mode)', () => {
     expect(r.body).toMatchObject({ mode: 'mock', liveReady: false });
     expect(r.body.liveFix).toMatch(/PF_URL/);
   });
+  it('/api/auth/config carries liveReady and the fix, so the web app need not try Live to find out', async () => {
+    const r = await request(mockApp().app).get('/api/auth/config');
+    expect(r.body).toMatchObject({ mode: 'mock', liveReady: false });
+    expect(r.body.liveFix).toMatch(/PF_URL/);
+  });
   it('live without PF settings is refused with the fix, and the mode stays mock', async () => {
     const ctx = mockApp();
     const r = await request(ctx.app).put('/api/mode').send({ mode: 'live' });

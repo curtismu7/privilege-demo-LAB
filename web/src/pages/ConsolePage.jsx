@@ -31,7 +31,7 @@ function Console() {
   const call = async () => {
     setBusy(true);
     const body = { tool: toolName, args, ...(asAgent ? { asAgent: true } : {}), ...(justification.trim() ? { justification: justification.trim() } : {}) };
-    const r = await api("/api/tools/call", { method: "POST", body });
+    const r = await api("/api/tools/call?envelope=1", { method: "POST", body });
     setRes(r.data && r.data.outcome ? r.data : { outcome: "error", rule: "request-failed", reason: r.data?.error ?? `HTTP ${r.status}`, overridden: [] });
     setBusy(false);
   };

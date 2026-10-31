@@ -12,7 +12,7 @@ import { setPresenter } from "../presenter";
 import { api } from "../api";
 import { getWorkspace, setWorkspace, validWorkspace } from "../workspace";
 import { mockApi, renderAs, PEOPLE, TOOLS, reply } from "../testUtils";
-import { SessionContext } from "../session";
+import { SessionContext, SessionProvider } from "../session";
 import { CAST_KEYS, VOCAB_KEYS } from "../../../server/src/customer.js";
 
 const WEB = path.resolve(process.cwd(), "src");
@@ -53,6 +53,18 @@ describe("Mock/Live toggle and banner, in the header of every page", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(/PF_URL and PF_AUDIENCE/);
     fireEvent.click(screen.getByRole("button", { name: "Mock" })); // already mock: no call
     expect(setMode).toHaveBeenCalledTimes(1);
+  });
+  it("the real session provider shows the fix for Live without sending the PUT that would answer 409, and loads the session without a 401", async () => {
+    const calls = mockApi({
+      "GET /api/auth/config": { ...mock, liveFix: "Set PF_URL and PF_AUDIENCE in ~/Development/.env, then restart." },
+      "GET /api/session": { me: null },
+      "GET /api/auth/mock/personas": { personas: [] },
+    });
+    render(<SessionProvider><AppShell /></SessionProvider>);
+    fireEvent.click(await screen.findByRole("button", { name: "Live" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/PF_URL and PF_AUDIENCE/);
+    expect(calls.some((c) => c.method === "PUT")).toBe(false);
+    expect(calls.some((c) => c.url === "/api/me")).toBe(false);
   });
   it("every page in the nav is wrapped by the shell, so every page has the toggle (the shell is the only place it lives)", () => {
     const main = fs.readFileSync(path.join(WEB, "main.jsx"), "utf8");

@@ -36,9 +36,9 @@ const getHealth = (port) => new Promise((resolve) => {
 const { loadSharedEnv } = await src('server/src/settings.js');
 const shared = loadSharedEnv();
 
-check('node 22 or newer', () => {
+check('node 26 or newer', () => {
   const major = Number(process.versions.node.split('.')[0]);
-  if (major < 22) throw new Error(`Node ${process.versions.node}; this app needs 22 or newer`);
+  if (major < 26) throw new Error(`Node ${process.versions.node}; this app needs 26 or newer (engines is >=26)`);
   return `Node ${process.versions.node}`;
 });
 

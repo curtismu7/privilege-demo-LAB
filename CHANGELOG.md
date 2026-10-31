@@ -9,6 +9,7 @@
 - Host check, same-origin JSON-only writes, bundled fonts, `Content-Security-Policy`.
 - Web: the shared stylesheet and the CSS standard (tokens only), diagram-studio/1 diagrams with Simulate, Reset and speed, a theme picker that only sets `data-theme`.
 - Docker is mock-first (the stub issuer is behind `--profile stub`); app port 4510 (dev server and tests 4760-4769); Node 26; CI on hosted runners (build, test, doctor, forbidden-strings, gitleaks); Learning Hub pack (D1) and shelf entry.
+- Fix pass: the doctor checks Node 26 or newer (it said 22); the browser console stays clean (`GET /api/session` answers 200 with `me: null` when signed out, the console calls `/api/tools/call?envelope=1` so a Deny is a 200 with the outcome in the body, and Live without settings shows the fix without sending the request that would answer 409); `npm run e2e` fails on any console error.
 - Imported without history; internal names and a customer-specific slogan were scrubbed.
 
 ## Earlier (before the standalone import)

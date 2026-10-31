@@ -17,6 +17,7 @@ describe('npm run doctor', () => {
     const lines = stdout.trim().split('\n');
     expect(lines.length).toBeGreaterThanOrEqual(10);
     expect(lines.filter((l) => !l.startsWith('ok    '))).toEqual([]);
+    expect(stdout).toMatch(/^ok {4}node 26 or newer: Node 26\./m);
     expect(stdout).toMatch(/netguard self-test, zero outbound attempts/);
     expect(stdout).toMatch(/health route answers demo-health\/1/);
   }, 60000);
@@ -26,6 +27,13 @@ describe('npm run doctor', () => {
     expect(res.code).toBe(1);
     expect(res.stdout).toMatch(/FAIL {2}configuration is valid: live mode needs PF_URL/);
   }, 60000);
+});
+
+describe('Node 26 only (owner decision 2026-10-31)', () => {
+  it('no source, script, doc or config file names Node 18, 20, 22 or 24 as supported', async () => {
+    const { stdout } = await run('git', ['grep', '-n', '-I', '-i', '-E', 'node(js)?[ -]?(v|version |>=)?(18|20|22|24)\\b|node@(18|20|22|24)|node:(18|20|22|24)', '--', '.', ':!package-lock.json', ':!CHANGELOG.md', ':!server/test/app/scripts.test.js'], { cwd: root }).catch((e) => (e.code === 1 ? { stdout: '' } : Promise.reject(e)));
+    expect(stdout).toBe('');
+  });
 });
 
 describe('npm run reset', () => {

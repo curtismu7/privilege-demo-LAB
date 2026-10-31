@@ -80,6 +80,19 @@ describe('mock sign-in refusals', () => {
     expect(proxyHeaderPresent({ 'X-Forwarded-For': 'x' })).toBe(true);
     expect(proxyHeaderPresent({ accept: '*/*', host: 'localhost', cookie: 'a=b' })).toBe(false);
   });
+  it('/api/session is always 200: me is null when nobody (or a bad cookie or a proxied request) is signed in, the same view as /api/me otherwise', async () => {
+    const ctx = mockApp();
+    expect((await request(ctx.app).get('/api/session')).body).toEqual({ me: null });
+    expect((await request(ctx.app).get('/api/session').set('cookie', 'pd_session=abc.def')).status).toBe(200);
+    const mark = await signedIn(ctx, 'mark');
+    const session = await mark.get('/api/session');
+    expect(session.status).toBe(200);
+    expect(session.body.me).toEqual((await mark.get('/api/me')).body);
+    const proxied = await mark.get('/api/session').set('x-forwarded-for', '9.9.9.9');
+    expect(proxied.status).toBe(200);
+    expect(proxied.body).toEqual({ me: null });
+    expect((await request(ctx.app).get('/api/me')).status).toBe(401); // the API door itself still says 401
+  });
   it('a session cookie stops working once a proxy header appears', async () => {
     const ctx = mockApp();
     const mark = await signedIn(ctx, 'mark');

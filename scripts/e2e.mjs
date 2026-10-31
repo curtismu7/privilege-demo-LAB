@@ -42,6 +42,7 @@ for (let i = 0; ; i++) {
 
 let browser;
 const results = [];
+const consoleProblems = []; // every browser console error and uncaught page error, from every page of every user
 const step = async (name, fn) => {
   try { await fn(); results.push([true, name]); console.log(`PASS  ${name}`); } catch (e) { results.push([false, name]); console.log(`FAIL  ${name}\n      ${String(e.message).split('\n')[0]}`); throw e; }
 };
@@ -57,6 +58,8 @@ try {
   const newUser = async (persona, label) => {
     const ctx = await browser.newContext({ viewport: { width: 1200, height: 900 } });
     const page = await ctx.newPage();
+    page.on('console', (m) => { if (m.type() === 'error') consoleProblems.push(`${label}: ${m.text()}`); });
+    page.on('pageerror', (e) => consoleProblems.push(`${label}: uncaught ${e.message}`));
     await page.goto(`${BASE}/`);
     await page.getByRole('button', { name: new RegExp(persona, 'i') }).click();
     await page.getByTestId('shell-user').waitFor();
@@ -177,6 +180,20 @@ try {
       await shot(dana.page, `page-${h.toLowerCase()}`);
     }
     await dana.ctx.close();
+  });
+
+  // ---- the browser console stays clean: a Deny, a refused Live switch and a signed-out load are normal results, not errors ----
+  await step('the browser console had no errors (Allow, Hold, Deny, approvals, drift, every page)', async () => {
+    const anon = await browser.newContext({ viewport: { width: 1200, height: 900 } });
+    const page = await anon.newPage();
+    page.on('console', (m) => { if (m.type() === 'error') consoleProblems.push(`signed out: ${m.text()}`); });
+    page.on('pageerror', (e) => consoleProblems.push(`signed out: uncaught ${e.message}`));
+    for (const p of ['/', '/policies', '/console', '/approvals', '/trace', '/learn', '/diagram']) { await page.goto(`${BASE}${p}`); await page.waitForLoadState('networkidle'); }
+    await page.goto(`${BASE}/`);
+    await page.getByRole('button', { name: 'Live' }).click();
+    await page.getByRole('alert').waitFor(); // the fix text is shown
+    await anon.close();
+    if (consoleProblems.length) throw new Error(`${consoleProblems.length} console problem(s), first: ${consoleProblems[0]}`);
   });
 } catch (e) {
   console.log(`\nStopped at the first failure: ${e.message}`);
