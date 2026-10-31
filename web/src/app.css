@@ -3,6 +3,9 @@
   loaded first. Tokens only here: no colour literals, no theme rules, nothing forced, emphasis by weight, breakpoints 600px and 900px.
 */
 
+/* ---- links: one colour from the tokens, first so the shell's own link rules below win ---- */
+a, a:visited { color: var(--status-info); }
+
 /* ---- shell ---- */
 .shell-bar {
   display: flex; align-items: center; gap: 12px 20px; flex-wrap: wrap; margin: 0 -16px; padding: 10px 16px;
@@ -32,7 +35,6 @@
 .mode-toggle__problem { margin: 0; max-width: 28rem; padding: 4px 8px; border-radius: 6px; background: var(--surface); color: var(--danger-text); font-size: 12px; font-weight: 600; }
 
 /* ---- page ---- */
-a, a:visited { color: var(--status-info); }
 .page { max-width: 72rem; margin: 24px auto; min-width: 0; }
 .page h1 { margin: 0 0 4px; font-size: 24px; }
 .page h2 { margin: 0 0 8px; font-size: 17px; }
