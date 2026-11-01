@@ -1,0 +1,15 @@
+# Optional overlay: gives the container the one shared settings file, read-only, so the app's own loader can read it
+# (docker compose -f docker-compose.yml -f docker-compose.shared-env.yml up --build -d).
+# Not `env_file`: that would put every key in the file into the container's environment. The app's loader keeps only the
+# keys it allows (PF_*, DEMO_MODE, ...) and drops the rest unread. The file must exist: compose refuses to start without it.
+services:
+  privilege-demo-lab:
+    environment:
+      STANDALONE_ENV: /run/standalone.env
+    volumes:
+      - type: bind
+        source: ${STANDALONE_ENV:-${HOME}/Development/.env}
+        target: /run/standalone.env
+        read_only: true
+        bind:
+          create_host_path: false
