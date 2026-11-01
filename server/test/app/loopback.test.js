@@ -48,3 +48,19 @@ describe('loopback-only', () => {
     expect(dockerfile).not.toMatch(/ALLOW_MOCK_SIGNIN/);
   });
 });
+
+describe('the shared settings file in Docker', () => {
+  it('the base compose never sets PF_ values to empty (an empty real variable beats the shared file)', () => {
+    const compose = read('docker-compose.yml');
+    expect(compose).not.toMatch(/PF_(URL|AUDIENCE|HTTP_HOSTS):\s*\$\{/);
+    expect(compose).not.toMatch(/env_file/);
+  });
+  it('the overlay mounts the file read-only, never creates it, and does not use env_file (which would copy every key)', () => {
+    const overlay = read('docker-compose.shared-env.yml');
+    expect(overlay).toMatch(/read_only: true/);
+    expect(overlay).toMatch(/create_host_path: false/);
+    expect(overlay).toMatch(/STANDALONE_ENV: \/run\/standalone\.env/);
+    expect(overlay).not.toMatch(/^\s*env_file:/m);
+    expect(overlay).not.toMatch(/ports:/);
+  });
+});
