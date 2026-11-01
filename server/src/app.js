@@ -178,7 +178,12 @@ export function createApp({ cfg = config(), now = () => Date.now(), fetchImpl = 
     (isAdmin(req.principal.claims) ? handler(req, res) : res.status(403).json({ error: 'admin_only' })));
 
   // ---- mode, config, preflight ----
-  const liveFix = () => (liveReady() ? {} : { liveFix: 'Set PF_URL and PF_AUDIENCE in ~/Development/.env (or the file STANDALONE_ENV names), then restart. Mock mode needs nothing.' });
+  const liveFix = () => {
+    const problems = liveProblems(cfg);
+    if (problems.length === 0) return {};
+    // Names what is missing. In Docker the container only sees the shared file through the compose overlay.
+    return { liveFix: `Live mode still needs: ${problems.join('; ')}. Set PF_URL and PF_AUDIENCE in ~/Development/.env (or the file STANDALONE_ENV names), then restart. In Docker also start with the overlay: docker compose -f docker-compose.yml -f docker-compose.shared-env.yml up -d. Mock mode needs nothing.` };
+  };
   const modeView = (req) => ({
     mode: mode(), liveReady: liveReady(),
     ...liveFix(),
