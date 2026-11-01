@@ -35,6 +35,11 @@ describe('the Mock/Live toggle (PUT /api/mode)', () => {
     expect(r.body).toMatchObject({ mode: 'mock', liveReady: false });
     expect(r.body.liveFix).toMatch(/PF_URL/);
   });
+  it('the fix names what is missing and, for Docker, the shared-env overlay', async () => {
+    const r = await request(mockApp().app).get('/api/mode');
+    expect(r.body.liveFix).toMatch(/live mode needs PF_URL; live mode needs PF_AUDIENCE/);
+    expect(r.body.liveFix).toMatch(/docker-compose\.shared-env\.yml/);
+  });
   it('/api/auth/config carries liveReady and the fix, so the web app need not try Live to find out', async () => {
     const r = await request(mockApp().app).get('/api/auth/config');
     expect(r.body).toMatchObject({ mode: 'mock', liveReady: false });

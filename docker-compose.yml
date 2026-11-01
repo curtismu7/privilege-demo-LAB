@@ -1,6 +1,8 @@
 # OrbStack:  docker compose up --build -d   ->  http://127.0.0.1:4510   (mock mode; nothing else to set up)
 # The port is published on 127.0.0.1 only (a test pins that). Do not widen it: mock sign-in has no password.
 #
+# Live mode (owner-run): to give the container your shared settings file (~/Development/.env, or the file STANDALONE_ENV names), add the overlay:
+#   docker compose -f docker-compose.yml -f docker-compose.shared-env.yml up --build -d
 # Live mode (owner-run) trusts the access tokens of your PingFederate. Put PF_URL and PF_AUDIENCE in your shell or in a local .env
 # next to this file, set DEMO_MODE=live (or press Live in the header), then `docker compose up --build -d`.
 # To try the live path with no PingFederate, add the local stub issuer (NOT PingFederate):
@@ -23,9 +25,10 @@ services:
       # Extra host names the app answers to besides 127.0.0.1 and localhost; every other Host is refused.
       LAB_ALLOWED_HOSTS: ${LAB_ALLOWED_HOSTS:-}
       PACK: ${PACK:-generic}
-      PF_URL: ${PF_URL:-}
-      PF_AUDIENCE: ${PF_AUDIENCE:-}
-      PF_HTTP_HOSTS: ${PF_HTTP_HOSTS:-}
+      # Passed through from your shell only when set. An empty value here would beat the shared settings file (real variables win).
+      PF_URL:
+      PF_AUDIENCE:
+      PF_HTTP_HOSTS:
     volumes:
       - privilege-demo-data:/data
     networks: [demo]

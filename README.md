@@ -117,7 +117,7 @@ Browser stories: `npm run build && npm run e2e` (S04, S01, S23, S05, and a check
 
 ## Troubleshooting
 
-1. **The toggle will not switch to Live.** It names the missing setting: add `PF_URL` and `PF_AUDIENCE` to `~/Development/.env` and restart.
+1. **The toggle will not switch to Live.** It names the missing settings: add `PF_URL` and `PF_AUDIENCE` to `~/Development/.env` and restart. In Docker the container only sees that file through the overlay: `docker compose -f docker-compose.yml -f docker-compose.shared-env.yml up --build -d` (the file is mounted read-only; the app keeps only the keys it allows). A PingFederate on your own machine is not reachable from the container at `127.0.0.1`, and a PingFederate with an expired or self-signed certificate fails the TLS check by design.
 2. **"Mock sign-in is off" on the first page.** Start with `npm start` (it allows mock sign-in on 127.0.0.1), or set `ALLOW_MOCK_SIGNIN=1`. It is refused behind a proxy, on a non-loopback bind, and in Live mode.
 3. **403 `host_not_allowed`.** The page was reached by a name that is not loopback. Use http://127.0.0.1:4510, or add the name to `LAB_ALLOWED_HOSTS`.
 4. **Port in use.** See Ports above.
