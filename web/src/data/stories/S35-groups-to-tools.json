@@ -4,7 +4,7 @@
   "modes": ["policies"],
   "demos": ["B7", "D1"],
   "goal": "{{dana}} decides which groups may use which MCP tools at {{vocab.org}}.",
-  "obstacle": "Three kinds of tool, four groups, and one call that must wait for a human.",
+  "obstacle": "Three plain tools, one that can wait for a human, and four groups.",
   "control": "Allow, hold or deny per group and tool, answered by the same Cedar policies that guard live calls.",
   "say": "One table shows what each group can do, and it is computed from the real policies.",
   "steps": [
@@ -25,7 +25,7 @@
     {
       "n": 3,
       "title": "Travel agents and the one that waits",
-      "tell": "Travel agents: book_fare allow. Tick Dot acts, fare 2,400: the same cell becomes hold, waiting for {{vocab.approverRole}}.",
+      "tell": "Travel agents: book_fare allow. Tick Dot acts, fare 2,400: the same cell becomes hold, waiting for {{vocab.approverRole}}. Then untick it: while it is ticked every call is unattended, so the other groups' allows turn to deny too.",
       "say": "Same group, same tool. Who is acting and how much decide whether it waits.",
       "why": "The hold is the middle answer between yes and no."
     },
@@ -34,7 +34,7 @@
       "title": "Finance",
       "tell": "Finance with the payments:write scope: pay_invoice allow, and nothing else.",
       "say": "Payments needs the group and the scope.",
-      "why": "Removing the scope in Test a request turns the cell to deny.",
+      "why": "Removing the scope in Test a request turns that result to deny. The table always asks finance with the scope, so its cell stays allow.",
       "blocked": {
         "tell": "In Test a request untick payments:write for the finance user. pay_invoice is denied.",
         "say": "A group alone is not enough for Payments."
@@ -50,13 +50,13 @@
     {
       "n": 6,
       "title": "Change a policy, watch the table",
-      "tell": "As {{dana}}, edit and save a policy. The table recomputes.",
+      "tell": "As {{dana}}, edit a policy and press Save as Active (a Candidate is only shadow-tested, so the table does not change). The table recomputes. Press Reset demo afterwards.",
       "say": "Edit a rule and see the effect across all groups.",
       "why": "A change that surprises someone shows up here first."
     }
   ],
   "proof": {
-    "happy": "The table with one decision per cell, including the one hold.",
+    "happy": "The table with one decision per cell. With Dot acts ticked, travel-agents book_fare is the one hold.",
     "blocked": "The table's deny cells, each with its deciding rule printed under the decision."
   }
 }

@@ -34,7 +34,7 @@
       "title": "{{priya}} answers",
       "tell": "Approve. The call is checked again against the current policies with one approval, runs once, and the booking confirmation appears on the request.",
       "say": "One click from the right person and the booking completes.",
-      "why": "Approval is re-evaluated, not trusted: a policy changed in the meantime still applies.",
+      "why": "An approval is re-checked against the current policies, not trusted: a policy changed in the meantime still applies. A denial simply ends the request without a re-check.",
       "blocked": {
         "tell": "Deny. The request shows denied by {{priya}} and the tool never ran. {{mark}} sees the reason on the request.",
         "say": "{{priya}} said no, and {{mark}} sees why."
@@ -43,13 +43,17 @@
     {
       "n": 5,
       "title": "Follow it in the trace",
-      "tell": "Open Trace. One request reads auth, cedar, pep (hold), then cedar again, tool and approval after the answer.",
+      "tell": "Open Trace (it lists newest first, so read it from the bottom). One request reads auth, cedar, pep (hold), then cedar again, tool and approval after the answer.",
       "say": "One request, every hop, who decided at each.",
-      "why": "The approver's identity is on the record next to the policy that required her."
+      "why": "{{priya}}'s name is on the approval row, and the pep row before it shows s01-hold-large-fare, the rule that required her.",
+      "blocked": {
+        "tell": "Open Trace (newest first, so read it from the bottom). The same request reads auth, cedar, pep (hold), then approval (deny) after {{priya}} answers. There is no second cedar row and no tool row.",
+        "say": "One request, every hop, and it stops at her no: the tool never ran."
+      }
     }
   ],
   "proof": {
-    "happy": "The approved request: approver {{priya}}, executed, with the booking result, and the Trace rows for the hold and the approval.",
-    "blocked": "The denied request: denied by {{priya}}, executed false, and no tool hop in the Trace."
+    "happy": "The approved request: approver {{priya}}, the tool ran, with the booking result, and the Trace rows for the hold and the approval.",
+    "blocked": "The denied request: denied by {{priya}}, the tool did not run, and no tool hop in the Trace."
   }
 }

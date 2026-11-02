@@ -8,7 +8,7 @@ const GENERIC_ARGS = (tool, dot) => ({ search_flights: { query: "SFO to JFK" }, 
   pay_invoice: { invoiceId: "INV-1001", amount: 250 }, book_fare: { flightId: "FL200", amount: dot ? 2400 : 500 } })[tool];
 
 /** S35: one decision per group x tool cell, asked of the live policies. Refreshes when `version` changes. */
-export default function MappingTable({ version = 0 }) {
+export default function MappingTable({ version = 0, onResults = null }) {
   const pack = usePack();
   const { groups: GROUPS, toolNames: TOOL_NAMES } = pack;
   const generic = pack.id === "generic";
@@ -24,9 +24,12 @@ export default function MappingTable({ version = 0 }) {
       await Promise.all(GROUPS.flatMap((g) => TOOL_NAMES.map(async (t) => {
         const claims = makeClaims({ sub: `table-${g}`, groups: [g], paymentsWrite: generic && g === "finance", dot, agent: pack.agent.sub });
         const r = await api("/api/decide-test", { method: "POST", body: { claims, tool: t, args: argsFor(t) } });
-        out[`${g}|${t}`] = r.ok ? { outcome: r.data.outcome, rule: r.data.rule } : { outcome: "error", rule: String(r.status) };
+        out[`${g}|${t}`] = r.ok ? { outcome: r.data.outcome, rule: r.data.rule, overridden: r.data.overridden } : { outcome: "error", rule: String(r.status) };
       })));
-      if (live) setCells(out);
+      if (live) {
+        setCells(out);
+        onResults?.("grid", Object.entries(out).map(([k, c]) => { const [g, t] = k.split("|"); return { label: `People in the ${g} group calling ${t}`, ...c }; }));
+      }
     })();
     return () => { live = false; };
   }, [version, dot]);
@@ -40,9 +43,12 @@ export default function MappingTable({ version = 0 }) {
       await Promise.all(pack.scenarios.map(async (s) => {
         const claims = makeClaims({ sub: s.sub, groups: s.groups, dot: s.agent === true, agent: pack.agent.sub });
         const r = await api("/api/decide-test", { method: "POST", body: { claims, tool: s.tool, args: s.args, approvalCount: s.approvalCount ?? 0 } });
-        out[s.id] = r.ok ? { outcome: r.data.outcome, rule: r.data.rule } : { outcome: "error", rule: String(r.status) };
+        out[s.id] = r.ok ? { outcome: r.data.outcome, rule: r.data.rule, overridden: r.data.overridden } : { outcome: "error", rule: String(r.status) };
       }));
-      if (live) setCases(out);
+      if (live) {
+        setCases(out);
+        onResults?.("cases", pack.scenarios.map((s) => ({ label: s.label, ...out[s.id] })));
+      }
     })();
     return () => { live = false; };
   }, [version, pack]);

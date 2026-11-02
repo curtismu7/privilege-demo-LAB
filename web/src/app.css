@@ -95,6 +95,58 @@ pre, .editor { font-family: var(--font-mono); font-size: 12px; }
 .guards li { margin: 4px 0; }
 .token-box { word-break: break-all; }
 
+
+/* ---- explanations, rule chips, guided start (sizes in em so presenter mode, which raises the body size, grows them too) ---- */
+.field-wrap { margin: 0; }
+.field-hint { margin: 2px 0 8px; font-size: 0.8em; }
+.result__gloss { font-weight: 400; font-size: 0.75em; }
+.explain { font-size: 0.95em; }
+.explain__headline { margin: 0 0 0.6em; font-size: 1.05em; font-weight: 700; overflow-wrap: anywhere; }
+.explain__section { margin: 0 0 0.8em; min-width: 0; }
+.explain__section h4 { margin: 0 0 0.2em; font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+.explain__section p { margin: 0; overflow-wrap: anywhere; }
+.rules-group { margin: 0.4em 0 0.8em; }
+.rules-group h5 { margin: 0 0 0.3em; font-size: 0.9em; }
+.rules-group > summary { cursor: pointer; font-size: 0.9em; }
+.explain__rules { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5em; }
+.explain__rule { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.3em 0.6em; padding: 0.5em 0.7em; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); min-width: 0; }
+.explain__oneline { flex-basis: 100%; font-size: 0.85em; }
+.explain__because { flex-basis: 100%; margin: 0; padding-left: 1.2em; font-size: 0.9em; }
+.explain__notes { margin: 0.5em 0 0; padding-left: 1.2em; font-size: 0.85em; }
+.explain__tech, .meaning__source { margin-top: 0.6em; }
+.explain__tech > summary, .meaning__source > summary, .glossary > summary, .howto-rules > summary { cursor: pointer; font-weight: 600; }
+.rule-chip { display: inline-block; padding: 0 0.6em; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text); font-size: 0.8em; font-weight: 700; white-space: nowrap; }
+.rule-chip[data-state="allowed"] { border-color: var(--status-ok); color: var(--status-ok); }
+.rule-chip[data-state="held"], .rule-chip[data-state="hold-moot"] { border-color: var(--status-warn); color: var(--status-warn); }
+.rule-chip[data-state="blocked"] { border-color: var(--danger-text); color: var(--danger-text); }
+.rule-chip[data-state="overridden"], .rule-chip[data-state="not-applied"], .rule-chip[data-state="not-about-tool"] { color: var(--muted); }
+.rule-chip[data-state="overridden"] { border-style: dashed; }
+.howto { margin: 0 0 1em; }
+.howto--closed { margin: 0 0 1em; }
+.howto__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5em; }
+.howto__head h2 { margin: 0; }
+.howto__steps { margin: 0.5em 0 0; padding-left: 1.4em; display: grid; gap: 0.3em; }
+.try__list { list-style: none; margin: 0.5em 0 0; padding: 0; display: grid; gap: 0.7em; }
+.try__item { display: grid; grid-template-columns: minmax(0, 20em) minmax(0, 1fr); gap: 0.3em 1em; align-items: start; }
+.try__item > button { text-align: left; }
+.try__item--other > button, .try__item--other .try__expect { opacity: 0.6; }
+.try__hint { grid-column: 2; font-size: 0.85em; }
+.glossary__list { margin: 0.6em 0 0; display: grid; gap: 0.5em; }
+.glossary__row dt { font-weight: 700; }
+.glossary__row dd { margin: 0; }
+.meaning__banner { margin: 0 0 0.6em; padding: 0.5em 0.7em; border: 1px dashed var(--status-warn); border-radius: 8px; }
+.meaning__does { margin: 0 0 0.6em; font-weight: 600; overflow-wrap: anywhere; }
+.meaning__conds { margin: 0; padding-left: 1.2em; }
+.meaning__examples { margin: 0.6em 0 0; padding-left: 1.2em; display: grid; gap: 0.3em; }
+.policy-cedar { font-size: 0.75em; margin-left: 0.3em; }
+.trace__why { margin-top: 0.5em; }
+.approval__why { margin: 0.6em 0; }
+@media (max-width: 600px) {
+  .try__item { grid-template-columns: minmax(0, 1fr); }
+  .try__hint { grid-column: 1; }
+  .explain .result__facts, .result .result__facts { grid-template-columns: minmax(0, 1fr); }
+}
+
 /* ---- talk track (story panel) lives in story/StoryPanel.css ---- */
 
 /* ---- presenter mode: the bar stays (the mode toggle must), the text grows ---- */

@@ -2,10 +2,16 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "../api";
 import { useSession } from "../session";
 import Badge from "../components/Badge";
+import Glossary from "../components/Glossary";
 import MappingTable from "../components/MappingTable";
+import PolicyMeaning, { KindBadge } from "../components/PolicyMeaning";
 import RequireSignIn from "../components/RequireSignIn";
 import TestRequest from "../components/TestRequest";
 import { PageStories } from "../story/StoryPanel";
+import { makeClaims } from "../claims";
+import { usePack } from "../pack";
+import { examplesFor } from "../policyExamples";
+import { useTryThis } from "../tryThis";
 
 const TEMPLATE = `@reason("Say why this rule exists")
 permit (principal in Group::"analysts", action == Action::"mcp:Invoke", resource)
@@ -14,8 +20,19 @@ when { context.app == "search" };
 const keyOf = (p) => `${p.state}:${p.id}`;
 const problemText = (p) => (p.policyId ? `${p.policyId}: ${p.message}` : p.message);
 
+const HOW = [
+  "Every rule is checked against the call: who is asking, which tool, and details such as the amount.",
+  "If any block rule applies, the call is not allowed. A hold rule is a block rule that a named person can release.",
+  "If no block rule applies, an allow rule must cover the call. If none does, it is denied (default deny).",
+  "A held call waits on the Approvals page. When the approver says yes, the rules are checked again with one approval recorded.",
+];
+
 function Policies() {
   const { me } = useSession();
+  const pack = usePack();
+  const scenarios = useTryThis();
+  const [pools, setPools] = useState({ grid: [], cases: [], tries: [] });
+  const [preview, setPreview] = useState(null);
   const admin = Boolean(me?.isAdmin);
   const [policies, setPolicies] = useState([]);
   const [loadError, setLoadError] = useState(null);
@@ -64,11 +81,47 @@ function Policies() {
     else setMessage(`Reset failed (${r.data?.error ?? r.status}).`);
   };
 
+  // Examples are real answers from Test a request: the Try-this requests (asked here, in one batch) plus the grid and cases below.
+  useEffect(() => {
+    if (!scenarios.length) return undefined;
+    let live = true;
+    (async () => {
+      const tries = [];
+      await Promise.all(scenarios.map(async (s, i) => {
+        const u = pack.testUsers.find((x) => x.id === (s.testUser ?? s.as));
+        if (!u) return;
+        const claims = makeClaims({ sub: u.id, groups: u.groups, paymentsWrite: u.paymentsWrite === true, dot: s.agent === true, agent: pack.agent.sub });
+        const r = await api("/api/decide-test", { method: "POST", body: { claims, tool: s.tool, args: s.args, approvalCount: s.approvalCount ?? 0, drift: s.drift === true } });
+        if (r.ok) tries[i] = { label: s.label, outcome: r.data.outcome, rule: r.data.rule, overridden: r.data.overridden };
+      }));
+      if (live) setPools((p) => ({ ...p, tries: tries.filter(Boolean) }));
+    })();
+    return () => { live = false; };
+  }, [version, scenarios, pack]);
+
+  // While an admin types, ask what the unsaved text would mean (a preview; nothing is saved).
+  useEffect(() => {
+    if (!admin || sel === null || !id || (current && text === current.text)) { setPreview(null); return undefined; }
+    let live = true;
+    const timer = setTimeout(async () => {
+      const r = await api("/api/policies/explain", { method: "POST", body: { id, text, state: current?.state ?? "active" } });
+      if (live) setPreview(r.ok && r.data?.ok ? { meaning: r.data.meaning } : r.ok ? { problems: r.data?.problems ?? [] } : null);
+    }, 500);
+    return () => { live = false; clearTimeout(timer); };
+  }, [admin, sel, id, text, current]);
+
+  const shownMeaning = preview?.meaning ?? current?.meaning ?? null;
+  // The examples are decided by the ACTIVE rules, so a staged candidate (same id, different text) gets none.
+  const examples = !preview?.meaning && current && current.state === "active" ? examplesFor(current.id, [...pools.tries, ...pools.cases, ...pools.grid]) : [];
   const editing = sel !== null;
   return (
     <main className="page">
       <h1>AI Policies</h1>
-      <p className="lede">Cedar policies decide every tool call: allow, deny, or hold for a person. A forbid beats a permit; anything no permit covers is denied.</p>
+      <p className="lede">Rules decide every tool call: allow it, deny it, or hold it for a person. Every rule is checked on every call. A block rule always beats an allow rule. If no rule applies, the call is denied.</p>
+      <details className="card howto-rules">
+        <summary>How rules combine</summary>
+        <ol>{HOW.map((h) => <li key={h}>{h}</li>)}</ol>
+      </details>
       <PageStories page="policies" />
       {loadError && <p role="alert" className="problems">The active policy set is broken, so every call is denied: {loadError.map(problemText).join("; ")}</p>}
 
@@ -82,8 +135,9 @@ function Policies() {
                   <button type="button" className="list-item" aria-current={keyOf(p) === sel ? "true" : undefined} onClick={() => open(p)}>
                     <code>{p.id}</code>
                     <Badge kind={p.state}>{p.state === "active" ? "Active" : "Candidate"}</Badge>
-                    <Badge kind={p.effect ?? "error"}>{p.effect ?? "?"}</Badge>
+                    {p.meaning?.kind ? <KindBadge meaning={p.meaning} /> : <Badge kind={p.effect ?? "error"}>{p.effect ?? "?"}</Badge>}
                     <span className="list-item__why">{p.reason}{p.approvers ? ` · approvers: ${p.approvers}` : ""}</span>
+                    {p.meaning?.oneLine && <span className="list-item__why">{p.meaning.oneLine}</span>}
                   </button>
                 </li>
               ))}
@@ -98,6 +152,9 @@ function Policies() {
               </div>
             )}
           </section>
+
+          {shownMeaning && <PolicyMeaning meaning={shownMeaning} examples={examples} preview={Boolean(preview?.meaning)} />}
+          {preview?.problems && <p className="muted" role="note">Showing the saved version of this rule. Your unsaved text does not validate yet, so it cannot be explained. Press Validate to see why.</p>}
 
           <section className="card" aria-labelledby="edit-h">
             <h2 id="edit-h">Policy editor</h2>
@@ -132,7 +189,8 @@ function Policies() {
         </div>
         <TestRequest />
       </div>
-      <MappingTable version={version} />
+      <MappingTable version={version} onResults={(k, entries) => setPools((prev) => ({ ...prev, [k]: entries }))} />
+      <Glossary />
     </main>
   );
 }

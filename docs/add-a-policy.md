@@ -34,6 +34,14 @@ when { context.args has amount && context.args.amount <= 500 };
 
 Remember Cedar semantics: no permit means deny; any matching `forbid` beats every `permit`.
 
+## How the page explains your policy
+
+After you save, **AI Policies** shows what the rule means in plain words, and every decision card lists it under Rules checked. While you type, the meaning of the unsaved text is previewed. The explanation follows the saved text: change `1000` to `500` and the next card says 500.
+
+The page can put these shapes into words: scope `principal in Group::"x"` or `== User::"x"`; `action == Action::"mcp:Invoke"` / `"mcp:InvokeUnattended"` or `in [both]`; `resource == Tool::"x"`; and in `when` / `unless`: `context.app == "x"` (or several joined with `||`), `[Tool::"a", Tool::"b"].contains(resource)`, `resource.toolName like "p*"`, `context.args has amount` and `context.args.amount > N` (also `>=`, `<`, `<=`, `==`, `!=`), `context.approval_count >= 1`, `context.token.scopes.contains("s")`, `context.token.client_id == "x"`, `context.pinnedHash != context.observedHash`, `resource has repo`, `[...strings].contains(resource.repo)`, `resource.classification == "x"`, `principal in Group::"x"` inside a condition, and `!` of any of these. A top-level `&&` in a `when` is split into parts.
+
+Anything else (arithmetic, other `||`, extension functions, records) is shown as **Explained from its text**: the `@reason` and the Cedar source, with the condition Cedar could not put into words quoted as written. Nothing is guessed. Give every policy a clear `@reason`: it is what a reader sees in that case.
+
 ## In the repo
 
 A shipped policy is a file in `server/src/cedar/policies/<id>.cedar` (the file name is the id). Add the file, add its cells to `server/test/cedar/mapping.test.js`, and run `npm test`. Policy text that is not specific to this demo's invented groups should keep the comment line saying the groups are invented.

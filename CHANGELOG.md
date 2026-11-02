@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased (explain every decision)
+
+- Every decision now says why, in plain English, built from the real evaluation and never typed per scenario: who is asking (person, groups, the agent acting for them), what was asked (tool, app, the amount, attended or unattended), one sentence naming the deciding rule, and "Rules checked" (each active rule: allowed it, blocked it, held it, did not apply with the true reason, or not about this tool), plus what would change the answer and who must approve and where. It is the new `explanation` object on `POST /api/tools/call`, on approvals, in `GET /api/trace` (`explanations`, keyed by span id) and on `POST /api/decide-test` with `explain: true`. Decisions, the hold and approval flow, the audit log, the trace events and the `/mcp` error shape are unchanged.
+- How: Cedar is asked once more, over permit-only pieces of each policy (the whole rule, each scope part, each condition), which pieces hold for this exact request. The answer is checked against `decide()`; on any disagreement the explanation drops its per-rule reasons and says so.
+- AI Policies: each rule shows what it does, who it covers, which tools, its conditions, whether it allows, blocks or holds, how rules combine, up to two examples computed from real answers, and a glossary. Rules whose shape cannot be put into words are shown as "explained from its text". `GET /api/policies` rows carry `meaning`; `POST /api/policies/explain` previews unsaved text.
+- `GET /api/trace` returns an explanation only to the requester, a named approver and an admin. "What would change the answer" is checked by running the request again with that one change, so it never promises an Allow that a second rule would still deny.
+- Tool console: a dismissible "How this works" strip, "Try this" buttons that fill in the form (never call) with what to expect in words, a hint under the agent box and the amount field. A test proves each printed expectation equals the real outcome, for both packs.
+- Fix pass after a browser run: the utility pack's repo-scope and restricted-evidence Deny cards no longer end with "Some conditions could not be put in words" (every condition is in words); a Try-this button written for another person is disabled; the generic pack gains "Mary tries to book a fare"; an approver reading a Hold is no longer told to sign in as themselves.
+
 ## 0.4.0 (standalone completion)
 
 - Mock mode is the default: an in-process mock issuer signs tokens labelled mock, `POST /api/mock/token` hands one to the signed-in persona, and `/mcp` works offline. Live mode (PingFederate) is the opt-in; the header toggle switches between them on every page and the banner says which is on.

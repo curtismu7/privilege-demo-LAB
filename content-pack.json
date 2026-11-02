@@ -76,6 +76,26 @@
       "id": "workspace",
       "term": "Workspace",
       "definition": "A name that scopes one presenter's policies, approvals, trace and sign-in. Reset clears only the current workspace."
+    },
+    {
+      "id": "allow-rule",
+      "term": "Allow rule",
+      "definition": "A rule that says which calls are allowed (Cedar calls it a permit). A call goes ahead only if an allow rule covers it and no block rule applies."
+    },
+    {
+      "id": "block-rule",
+      "term": "Block rule",
+      "definition": "A rule that says which calls are not allowed (Cedar calls it a forbid). It always beats an allow rule."
+    },
+    {
+      "id": "default-deny",
+      "term": "Default deny",
+      "definition": "If no allow rule covers a call, it is denied. Nothing is allowed just because no rule mentions it."
+    },
+    {
+      "id": "unattended",
+      "term": "Unattended call",
+      "definition": "A call an agent makes for a person: the token carries the agent's name. Some rules only look at unattended calls. The opposite is an attended call, made by the person directly."
     }
   ],
   "sources": [
@@ -269,7 +289,7 @@
     {
       "id": "S04",
       "title": "Mary gets 2 of 3 tools",
-      "say": "The agent only gets what Mary is allowed to use, so it cannot be tricked into asking for more.",
+      "say": "Policy decides tool by tool from Mary's token, so she only gets what she is allowed to use.",
       "file": "web/src/data/stories/S04-two-of-three-tools.json"
     },
     {

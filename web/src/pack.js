@@ -4,6 +4,7 @@
 import { useMemo } from "react";
 import { useSession } from "./session";
 import { GROUPS, TEST_USERS, TOOL_NAMES } from "./claims";
+import tryThisGeneric from "./data/tryThis.generic.json";
 
 export const GENERIC_PACK = {
   id: "generic",
@@ -14,6 +15,7 @@ export const GENERIC_PACK = {
   agent: { sub: "dot", label: "Dot (Mark's agent) makes the call, unattended", defaultOn: false },
   argDefaults: null,
   scenarios: [],
+  tryThis: tryThisGeneric,
   personas: null,
 };
 

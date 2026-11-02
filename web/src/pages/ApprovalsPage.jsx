@@ -3,6 +3,7 @@ import { api } from "../api";
 import { useSession } from "../session";
 import { usePack } from "../pack";
 import Badge from "../components/Badge";
+import Explanation from "../components/Explanation";
 import RequireSignIn from "../components/RequireSignIn";
 import { PageStories } from "../story/StoryPanel";
 
@@ -47,12 +48,21 @@ function Approvals() {
                 <dt>Expires</dt><dd>{new Date(a.expiresAt).toLocaleTimeString()}</dd>
                 {a.outcome && (<><dt>Outcome</dt><dd><Badge kind={a.outcome.decision} /> {a.outcome.reason}{a.decidedBy ? ` (${a.decidedBy})` : ""}{a.outcome.executed ? ", the tool ran" : ", the tool did not run"}</dd></>)}
               </dl>
+              {(a.outcome?.explanation ?? a.explanation) && (
+                <details className="approval__why" open>
+                  <summary>{a.outcome?.explanation ? "Why it ended this way" : "Why this was held"}</summary>
+                  <Explanation explanation={a.outcome?.explanation ?? a.explanation} />
+                </details>
+              )}
               {a.outcome?.result && <pre className="result__body" aria-label="Tool result">{JSON.stringify(a.outcome.result, null, 2)}</pre>}
               {mayDecide(a) ? (
+                <>
+                <p className="muted">If you approve, the rules are checked again with one approval recorded and the tool runs once.</p>
                 <div className="row">
                   <button type="button" className="primary" onClick={() => decide(a, "approve")}>Approve {a.tool}</button>
                   <button type="button" onClick={() => decide(a, "deny")}>Deny {a.tool}</button>
                 </div>
+                </>
               ) : a.status === "pending" && (
                 <p className="muted">{a.requester.sub === me.sub ? "You asked for this; someone else has to answer it." : "Only the named approvers can answer this."}</p>
               )}

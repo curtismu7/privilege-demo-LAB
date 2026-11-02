@@ -21,7 +21,7 @@ export function createApprovals({ now, ttlMs, onExpire = () => {} }) {
     requester: { sub: r.claims.sub, actor: r.claims.act?.sub ?? null },
     policy: r.policy, approvers: r.approvers, justification: r.justification,
     createdAt: r.createdAt, expiresAt: new Date(r.expiresAtMs).toISOString(),
-    decidedBy: r.decidedBy ?? null, decidedAt: r.decidedAt ?? null, outcome: r.outcome ?? null,
+    decidedBy: r.decidedBy ?? null, decidedAt: r.decidedAt ?? null, outcome: r.outcome ?? null, explanation: r.explanation ?? null,
   });
 
   return {

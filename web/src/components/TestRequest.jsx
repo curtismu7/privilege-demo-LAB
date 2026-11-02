@@ -34,7 +34,7 @@ export default function TestRequest() {
 
   const run = async () => {
     setBusy(true);
-    const body = { claims: makeClaims({ sub: userId, groups, paymentsWrite, dot, agent: pack.agent.sub }), tool: toolName, args, approvalCount, drift };
+    const body = { claims: makeClaims({ sub: userId, groups, paymentsWrite, dot, agent: pack.agent.sub }), tool: toolName, args, approvalCount, drift, explain: true };
     const r = await api("/api/decide-test", { method: "POST", body });
     setRes(r.ok ? r.data : { outcome: "error", rule: "request-failed", reason: r.data?.error ?? `HTTP ${r.status}`, overridden: [] });
     setBusy(false);

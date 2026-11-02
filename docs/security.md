@@ -39,6 +39,10 @@ Every request must come to a loopback `Host` (plus `LAB_ALLOWED_HOSTS`), so a re
 - **State is in memory** (approvals, sessions, trace); a restart loses it. Policies and `audit.jsonl` are files under `DATA_DIR`.
 - The admin can edit policies with arbitrary Cedar text; validation checks syntax and schema, not intent.
 
+## What the explanation shows
+
+The decision card repeats values from the token (the sub, groups, scopes, the agent) and from the request. These come from a caller (in live mode from PingFederate), so every such value is stripped of control and format characters, cut to a fixed length (at most 20 groups and 20 scopes are listed), and replaced by `[withheld]` if it looks like a credential (the same guard the trace uses). Free-text arguments (a subject, a query, a body, a justification) are never shown; only values a rule actually reads (the amount, the repository, the data classification) are. The page renders every sentence as plain text. The audit log does not carry the explanation. Persona names appear only in mock mode: a live user whose sub is `mark` is shown as `mark`. The explainer makes no network calls (it is Cedar's wasm, behind the same no-network test as the rest of the engine).
+
 ## Secrets in the repo
 
 `.env` is gitignored; `.env.example` has no secrets. Settings come from the shared `~/Development/.env`, of which only this app's keys are read (`server/src/settings.js`); admin and worker credentials are never read. A gitleaks pre-commit hook (`.githooks/pre-commit`) and the CI gitleaks and forbidden-strings jobs guard against commits. No tenant ids or private hostnames are in the repo.
