@@ -4,7 +4,7 @@
   "modes": ["policies"],
   "demos": ["B7", "D1"],
   "goal": "{{dana}} decides which groups may use which MCP tools at {{vocab.org}}.",
-  "obstacle": "Three kinds of tool, four groups, and one call that must wait for a human.",
+  "obstacle": "Three plain tools, one that can wait for a human, and four groups.",
   "control": "Allow, hold or deny per group and tool, answered by the same Cedar policies that guard live calls.",
   "say": "One table shows what each group can do, and it is computed from the real policies.",
   "steps": [

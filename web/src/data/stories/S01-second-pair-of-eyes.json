@@ -53,7 +53,7 @@
     }
   ],
   "proof": {
-    "happy": "The approved request: approver {{priya}}, executed, with the booking result, and the Trace rows for the hold and the approval.",
-    "blocked": "The denied request: denied by {{priya}}, executed false, and no tool hop in the Trace."
+    "happy": "The approved request: approver {{priya}}, the tool ran, with the booking result, and the Trace rows for the hold and the approval.",
+    "blocked": "The denied request: denied by {{priya}}, the tool did not run, and no tool hop in the Trace."
   }
 }
