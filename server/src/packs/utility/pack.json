@@ -315,5 +315,240 @@
     },
     "agentStep": "The delivery agent sends a tools/call request with the person's PingFederate access token (sub = the person, act = the agent). The PEP is the only door to the tools; every backend behind it is a mock."
   },
-  "approvalsHint": "Ben (business analyst): backlog.update_story with the delivery agent making the call."
+  "approvalsHint": "Ben (business analyst): backlog.update_story with the delivery agent making the call.",
+  "tryThis": [
+    {
+      "id": "pr-comment-own-repo",
+      "label": "{{eli}}'s agent comments on a PR in the team's repo",
+      "as": "eli",
+      "tool": "github.post_review_comment",
+      "args": {
+        "repo": "grid-ops-portal",
+        "pr": 42,
+        "body": "Please add a test for the outage banner."
+      },
+      "agent": true,
+      "note": "Allowed: engineers may comment on pull requests in their own repos.",
+      "expect": {
+        "outcome": "allow",
+        "rule": "u10-engineers-pr-review"
+      }
+    },
+    {
+      "id": "pr-read-other-repo",
+      "label": "{{eli}}'s agent reads a PR in another team's repo",
+      "as": "eli",
+      "tool": "github.read_pr",
+      "args": {
+        "repo": "meter-data-lake",
+        "pr": 42
+      },
+      "agent": true,
+      "note": "Denied: engineers are limited to their own team's repos, even though they may read PRs.",
+      "expect": {
+        "outcome": "deny",
+        "rule": "u40-repo-scope-engineers"
+      }
+    },
+    {
+      "id": "kb-internal",
+      "label": "{{eli}}'s agent searches the runbooks",
+      "as": "eli",
+      "tool": "kb.search",
+      "args": {
+        "query": "outage notification runbook",
+        "collection": "runbooks"
+      },
+      "agent": true,
+      "note": "Allowed: engineers may search internal knowledge-base collections.",
+      "expect": {
+        "outcome": "allow",
+        "rule": "u11-engineers-research"
+      }
+    },
+    {
+      "id": "kb-restricted-engineer",
+      "label": "{{eli}}'s agent searches restricted audit evidence",
+      "as": "eli",
+      "tool": "kb.search",
+      "args": {
+        "query": "outage notification runbook",
+        "collection": "audit-evidence"
+      },
+      "agent": true,
+      "note": "Denied: restricted evidence is for the compliance group only.",
+      "expect": {
+        "outcome": "deny",
+        "rule": "u41-restricted-evidence-compliance-only"
+      }
+    },
+    {
+      "id": "kb-restricted-compliance",
+      "label": "{{cora}}'s agent searches the same restricted evidence",
+      "as": "cora",
+      "tool": "kb.search",
+      "args": {
+        "query": "outage notification runbook",
+        "collection": "audit-evidence"
+      },
+      "agent": true,
+      "note": "Allowed: the compliance group may read restricted evidence.",
+      "expect": {
+        "outcome": "allow",
+        "rule": "u14-compliance-evidence"
+      }
+    },
+    {
+      "id": "pr-read-governance",
+      "label": "{{gwen}}'s agent reads a PR in any repo",
+      "as": "gwen",
+      "tool": "github.read_pr",
+      "args": {
+        "repo": "meter-data-lake",
+        "pr": 42
+      },
+      "agent": true,
+      "note": "Allowed: governance reviewers may read pull requests in any repo.",
+      "expect": {
+        "outcome": "allow",
+        "rule": "u12-governance-review"
+      }
+    },
+    {
+      "id": "story-draft",
+      "label": "{{ben}}'s agent drafts a story",
+      "as": "ben",
+      "tool": "backlog.create_story_draft",
+      "args": {
+        "title": "Show planned-outage window on the portal"
+      },
+      "agent": true,
+      "note": "Allowed: business analysts may draft stories.",
+      "expect": {
+        "outcome": "allow",
+        "rule": "u13-analysts-backlog"
+      }
+    },
+    {
+      "id": "story-update-hold",
+      "label": "{{ben}}'s agent updates a story",
+      "as": "ben",
+      "tool": "backlog.update_story",
+      "args": {
+        "storyId": "ST-101",
+        "change": "Move to Ready for review"
+      },
+      "agent": true,
+      "note": "Held until {{priya}} approves it on the Approvals page.",
+      "expect": {
+        "outcome": "hold",
+        "rule": "u30-hold-story-update",
+        "approvers": [
+          "priya"
+        ]
+      }
+    },
+    {
+      "id": "requirement-update-hold",
+      "label": "{{gwen}}'s agent asks to update a requirement",
+      "as": "gwen",
+      "tool": "confluence.update_requirement",
+      "args": {
+        "requirementId": "REQ-17",
+        "change": "Reword acceptance criterion 2"
+      },
+      "agent": true,
+      "note": "Held until {{priya}} approves it on the Approvals page.",
+      "expect": {
+        "outcome": "hold",
+        "rule": "u31-hold-requirement-update",
+        "approvers": [
+          "priya"
+        ]
+      }
+    },
+    {
+      "id": "merge-pr",
+      "label": "{{eli}}'s agent merges a PR",
+      "as": "eli",
+      "tool": "github.merge_pr",
+      "args": {
+        "repo": "grid-ops-portal",
+        "pr": 42
+      },
+      "agent": true,
+      "note": "Denied: agents never merge or approve a pull request, and no approval changes that.",
+      "expect": {
+        "outcome": "deny",
+        "rule": "u20-never-merge-or-approve-pr"
+      }
+    },
+    {
+      "id": "change-policy",
+      "label": "{{eli}}'s agent changes an access policy",
+      "as": "eli",
+      "tool": "policy.change",
+      "args": {
+        "policyId": "u10-engineers-pr-review",
+        "change": "Allow merge"
+      },
+      "agent": true,
+      "note": "Denied: agents never change access policy.",
+      "expect": {
+        "outcome": "deny",
+        "rule": "u21-never-change-policy"
+      }
+    },
+    {
+      "id": "deploy-production",
+      "label": "{{gwen}}'s agent deploys to production",
+      "as": "gwen",
+      "tool": "deploy.production",
+      "args": {
+        "service": "grid-ops-portal"
+      },
+      "agent": true,
+      "note": "Denied: agents never deploy, and no approval changes that.",
+      "expect": {
+        "outcome": "deny",
+        "rule": "u22-never-deploy"
+      }
+    },
+    {
+      "id": "probe-schema-changed",
+      "label": "{{eli}}'s agent reads a PR after the tool's schema changed",
+      "as": "eli",
+      "tool": "github.read_pr",
+      "args": {
+        "repo": "grid-ops-portal",
+        "pr": 42
+      },
+      "agent": true,
+      "drift": true,
+      "exampleOnly": true,
+      "note": "Denied: a tool whose description or schema changed since it was approved is blocked for everyone.",
+      "expect": {
+        "outcome": "deny",
+        "rule": "s05-rugpull-pin"
+      }
+    },
+    {
+      "id": "probe-story-approved",
+      "label": "The same story update after {{priya}} approves (one approval)",
+      "as": "ben",
+      "tool": "backlog.update_story",
+      "args": {
+        "storyId": "ST-101",
+        "change": "Move to Ready for review"
+      },
+      "agent": true,
+      "approvalCount": 1,
+      "exampleOnly": true,
+      "note": "Allowed once someone has approved: the hold rule stops applying.",
+      "expect": {
+        "outcome": "allow",
+        "rule": "u13-analysts-backlog"
+      }
+    }
+  ]
 }

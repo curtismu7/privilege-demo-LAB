@@ -32,6 +32,15 @@ export function scanStories(root) {
     }
   };
   check(jsonIn(path.join(data, 'stories')), jsonIn(path.join(data, 'verticals')));
+  // Try-this scenarios (labels and notes carry {{cast}} tokens too): the generic list against every generic vertical, the utility pack's against its own.
+  const tries = (name, list, verticalFiles) => {
+    for (const v of verticalFiles.map(readJson)) for (const token of tokensOf(list)) { tokens += 1; if (!defined(v, token)) missing.push(`try-this ${name} uses {{${token}}} which ${v.id} lacks`); }
+  };
+  const genericTry = path.join(data, 'tryThis.generic.json');
+  if (fs.existsSync(genericTry)) tries('generic', readJson(genericTry), jsonIn(path.join(data, 'verticals')));
+  const utilityPack = path.join(root, 'server', 'src', 'packs', 'utility', 'pack.json');
+  const utilityVertical = path.join(data, 'packs', 'utility', 'vertical.json');
+  if (fs.existsSync(utilityPack) && fs.existsSync(utilityVertical)) tries('utility', readJson(utilityPack).tryThis ?? [], [utilityVertical]);
   const packs = path.join(data, 'packs');
   if (fs.existsSync(packs)) {
     for (const id of fs.readdirSync(packs).sort()) {

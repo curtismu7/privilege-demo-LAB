@@ -28,10 +28,13 @@ export default function ArgFields({ tool, args, onChange }) {
           );
         }
         return (
-          <label key={k} className="field">{k}
-            <input id={`${uid}-${k}`} type={num ? "number" : "text"} min={num ? 0 : undefined} step={num ? 1 : undefined}
-              value={args[k] ?? ""} onChange={(e) => onChange({ ...args, [k]: num ? (e.target.value === "" ? "" : Number(e.target.value)) : e.target.value })} />
-          </label>
+          <div key={k} className="field-wrap">
+            <label className="field">{k}
+              <input id={`${uid}-${k}`} type={num ? "number" : "text"} min={num ? 0 : undefined} step={num ? 1 : undefined} aria-describedby={k === "amount" ? `${uid}-${k}-hint` : undefined}
+                value={args[k] ?? ""} onChange={(e) => onChange({ ...args, [k]: num ? (e.target.value === "" ? "" : Number(e.target.value)) : e.target.value })} />
+            </label>
+            {k === "amount" && <p id={`${uid}-${k}-hint`} className="field-hint muted">Rules can set limits on this number.</p>}
+          </div>
         );
       })}
     </>

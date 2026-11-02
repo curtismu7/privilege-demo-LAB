@@ -1,0 +1,53 @@
+{
+  "v": 1,
+  "outcome": "deny",
+  "kind": "before-rules",
+  "headline": "Denied before any rule was checked.",
+  "who": {
+    "sub": "mark",
+    "name": "Mark",
+    "groups": [
+      "travel-agents"
+    ],
+    "groupsMore": 0,
+    "scopes": [
+      "tools:invoke"
+    ],
+    "scopesMore": 0,
+    "agent": null,
+    "via": "a mock sign-in (persona)",
+    "text": "Mark, in the group travel-agents, with the scope tools:invoke. Signed in with a mock sign-in (persona)."
+  },
+  "asked": {
+    "tool": "nope",
+    "app": null,
+    "attended": true,
+    "attendedText": "",
+    "details": [],
+    "approvalsSoFar": 0,
+    "schemaChanged": false,
+    "text": "nope (not a tool this server offers)."
+  },
+  "why": "“nope” is not a tool this server offers.",
+  "decidedBy": null,
+  "rules": [],
+  "change": null,
+  "approval": null,
+  "before": {
+    "code": "unknown-tool",
+    "problems": []
+  },
+  "notes": [],
+  "checks": {
+    "agreed": true,
+    "rules": 0,
+    "clauses": 0
+  },
+  "technical": {
+    "rule": "unknown-tool",
+    "reason": "“nope” is not a tool this server offers.",
+    "rules": [],
+    "overridden": [],
+    "engine": "4.14.0"
+  }
+}

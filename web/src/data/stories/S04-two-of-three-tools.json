@@ -3,15 +3,15 @@
   "title": "{{mary}} gets 2 of 3 tools",
   "modes": ["console"],
   "demos": ["D1", "B7"],
-  "goal": "{{mary}} asks an agent to use {{vocab.toolsThree}} at {{vocab.org}}: search_flights, create_ticket and pay_invoice.",
+  "goal": "{{mary}} uses {{vocab.toolsThree}} at {{vocab.org}}: search_flights, create_ticket and pay_invoice.",
   "obstacle": "{{mary}} is in the analysts group. Policy lets analysts use Search and Ticketing, and nothing lets her use Payments.",
-  "control": "One Cedar permit per app. A tool no permit covers is denied by default, and the denial names the deciding policy.",
-  "say": "The agent only gets what {{mary}} is allowed to use, so it cannot be tricked into asking for more.",
+  "control": "One Cedar permit covers Search and Ticketing for analysts, and another covers Payments for finance. A tool no permit covers is denied by default, and the denial names the deciding policy.",
+  "say": "Policy decides tool by tool from {{mary}}'s token, so she only gets what she is allowed to use.",
   "steps": [
     {
       "n": 1,
       "title": "Sign in as {{mary}}",
-      "tell": "Pick {{mary}} on the sign-in page. Her token carries the group analysts and the scope tools:invoke. The shell shows both.",
+      "tell": "Pick {{mary}} on the sign-in page. Her token carries the group analysts and the scope tools:invoke. The shell shows the group; the scope is in the Who asked line of every result card.",
       "say": "This is {{mary}}'s token. Everything the policy decides, it decides from these claims.",
       "why": "Policy reads claims from the access token, never from what the agent says about itself."
     },
@@ -27,23 +27,23 @@
       "title": "Ticketing is allowed",
       "tell": "Call create_ticket. Same policy, same group, a different app.",
       "say": "Two of the three tools, one policy.",
-      "why": "The policy is per app, so Ticketing needed no extra rule."
+      "why": "One permit covers both apps, so Ticketing needed no extra rule."
     },
     {
       "n": 4,
       "title": "Payments",
       "tell": "In the AI Policies tab, open Test a request, pick the finance user (finance group with the payments:write scope) and pay_invoice: allow, decided by s04-payments-finance-only.",
-      "say": "A finance user with the payments scope gets all three.",
+      "say": "A finance user with the payments scope gets Payments, which {{mary}} does not. Each group gets its own apps.",
       "why": "Payments needs both the group and the scope, so a finance user without the scope is denied too.",
       "blocked": {
-        "tell": "Call pay_invoice as {{mary}}. The result card says deny with the rule default-deny: no permit covers her. Search and Ticketing still work.",
+        "tell": "Call pay_invoice as {{mary}}. The result card says deny: no permit covers her (default deny; the rule id is under Technical details). Search and Ticketing still work.",
         "say": "Payments is denied with a named reason, and the other two keep working."
       }
     },
     {
       "n": 5,
       "title": "Read the record",
-      "tell": "Open the Trace tab. Each call is a row with the auth, cedar, pep and tool hops, the decision and the deciding rule. No token is shown anywhere.",
+      "tell": "Open the Trace tab. Each call leaves a row for each hop it passed (auth, cedar, pep, and tool if it ran), newest first, with the decision and the deciding rule. The pep Final decision row is the one that matters. No token is shown anywhere.",
       "say": "Every decision leaves a record you can read to a customer.",
       "why": "The proof is the decision and its deciding policy, not a screenshot of an error."
     }

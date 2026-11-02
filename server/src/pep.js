@@ -23,7 +23,11 @@ export function evaluate({ policySet, claims, tool, app, args, pinnedHash, obser
 }
 
 // attribution (a pack option): every trace event and result also names the tool and who it was for (user sub + agent act.sub).
-export function createPep({ backend, store, approvals, tracer, audit, now, attribution = false }) {
+// explainer / explanations (optional, see explain/): the plain-English "why" is built after the outcome is known and only added to the
+// result body and to a side map keyed by the pep hop's span id. It can never change an outcome: every call is guarded.
+export function createPep({ backend, store, approvals, tracer, audit, now, attribution = false, explainer = null, explanations = null }) {
+  const spanOf = (tp) => tp.split('-')[2];
+  const attach = (build) => { try { return build() ?? null; } catch { return null; } };
   const subjectOf = (claims) => (typeof claims?.sub === 'string' && claims.sub ? claims.sub : null);
   const actorOf = (claims) => (typeof claims?.act?.sub === 'string' ? { sub: claims.act.sub } : null);
   const auditRow = (extra) => audit.write(extra);
@@ -44,20 +48,31 @@ export function createPep({ backend, store, approvals, tracer, audit, now, attri
     const subject = subjectOf(claims);
     const actor = actorOf(claims);
     let tp = traceparent;
+    let explain = null; // () => explanation, set once we know what to explain
     const finish = (outcome, rule, reason, body = {}) => {
       ({ traceparent: tp } = emit(tp, { hop: 'pep', subject, actor, decision: { result: outcome, rule, reason }, latency_ms: performance.now() - t0 }, tool));
       auditRow({ kind: 'tool_call', source, sub: subject, actor: actor?.sub ?? null, tool, outcome, rule, approval_id: body.approvalId ?? null, trace_id: tp.split('-')[1] });
-      return { outcome, rule, reason, ...body, ...who(claims, tool), traceparent: tp, trace_id: tp.split('-')[1] };
+      const explanation = explainer && explain ? attach(() => explain(outcome, body)) : null;
+      if (explanation) explanations?.put(spanOf(tp), explanation);
+      return { outcome, rule, reason, ...body, ...(explanation ? { explanation } : {}), ...who(claims, tool), traceparent: tp, trace_id: tp.split('-')[1] };
     };
 
     const def = backend.tool(tool);
-    if (!def) return finish('deny', 'unknown-tool', 'No such tool', { rules: [], overridden: [] });
+    if (!def) {
+      explain = () => explainer.forBefore({ code: 'unknown-tool', claims, tool, source });
+      return finish('deny', 'unknown-tool', 'No such tool', { rules: [], overridden: [] });
+    }
     const problems = argProblems(def.inputSchema, args);
-    if (problems.length) return finish('deny', 'invalid-arguments', 'Tool arguments are not valid', { problems, rules: [], overridden: [] });
+    if (problems.length) {
+      explain = () => explainer.forBefore({ code: 'invalid-arguments', problems, claims, tool, app: def.app, source });
+      return finish('deny', 'invalid-arguments', 'Tool arguments are not valid', { problems, rules: [], overridden: [] });
+    }
 
     const policySet = store.activeSet();
     const resource = backend.resourceAttrs(tool, args);
     const d = evaluate({ policySet, claims, tool, app: def.app, args, pinnedHash: backend.pinnedHash(tool), observedHash: backend.observedHash(tool), resource });
+    explain = (outcome) => explainer.forCall({ policySet, claims, tool, app: def.app, args, resource, pinnedHash: backend.pinnedHash(tool), observedHash: backend.observedHash(tool),
+      approvalCount: 0, d, outcome, source });
     ({ traceparent: tp } = emit(tp, { product: d.trace.product, hop: d.trace.hop, subject, actor,
       decision: { result: classify(d, policySet), rule: d.rule, reason: d.reason }, latency_ms: d.trace.latency_ms }, tool));
     const body = { rules: d.rules, overridden: d.overridden, problems: d.problems, app: def.app };
@@ -76,6 +91,7 @@ export function createPep({ backend, store, approvals, tracer, audit, now, attri
       const { record } = approvals.create({ claims, tool, app: def.app, args, policy: { rule: d.rule, reason: d.reason }, approvers, justification, traceparent: tp });
       const out = finish('hold', d.rule, d.reason, { ...body, approvalId: record.id, approvers, expiresAt: new Date(record.expiresAtMs).toISOString() });
       record.traceparent = out.traceparent;
+      if (out.explanation) record.explanation = out.explanation;
       return out;
     }
     return finish('deny', d.rule, d.reason, body);
@@ -91,8 +107,10 @@ export function createPep({ backend, store, approvals, tracer, audit, now, attri
     record.decidedBy = approver.sub;
     record.decidedAt = new Date(now()).toISOString();
     let outcome;
+    let explanation = null;
     if (!approve) {
       record.status = 'denied';
+      if (explainer) explanation = attach(() => explainer.forAnswer({ status: 'denied', claims, tool: record.tool, app: record.app, args: record.args, approverSubs: record.approvers, approver: approver.sub }));
       outcome = { decision: 'deny', rule: record.policy.rule, reason: `Denied by ${approver.sub}`, executed: false };
     } else {
       record.status = 'approved';
@@ -102,6 +120,11 @@ export function createPep({ backend, store, approvals, tracer, audit, now, attri
         resource: backend.resourceAttrs(record.tool, record.args) });
       ({ traceparent: tp } = emit(tp, { product: d.trace.product, hop: d.trace.hop, subject, actor,
         decision: { result: classify(d, policySet), rule: d.rule, reason: d.reason }, latency_ms: d.trace.latency_ms }, record.tool));
+      if (explainer) {
+        explanation = attach(() => explainer.forCall({ policySet, claims, tool: record.tool, app: record.app, args: record.args, resource: backend.resourceAttrs(record.tool, record.args),
+          pinnedHash: backend.pinnedHash(record.tool), observedHash: backend.observedHash(record.tool), approvalCount: 1, d, outcome: d.decision === 'allow' ? 'allow' : 'deny',
+          source: 'approval', approval: { status: 'approved', approver: approver.sub } }));
+      }
       if (d.decision === 'allow') {
         const ran = run(claims, record.tool, record.args, d, tp, 'approval');
         tp = ran.tp;
@@ -110,10 +133,12 @@ export function createPep({ backend, store, approvals, tracer, audit, now, attri
         outcome = { decision: 'deny', rule: d.rule, reason: d.reason, executed: false };
       }
     }
+    if (explanation) outcome.explanation = explanation;
     record.outcome = outcome;
     ({ traceparent: tp } = emit(tp, { hop: 'approval', subject, actor,
       decision: { result: outcome.decision, rule: outcome.rule, reason: `${approve ? 'approved' : 'denied'} by ${approver.sub}` }, latency_ms: performance.now() - t0 }, record.tool));
     record.traceparent = tp;
+    if (explanation) explanations?.put(spanOf(tp), explanation);
     auditRow({ kind: 'approval', approval_id: record.id, sub: subject, tool: record.tool, approver: approver.sub, approved: approve, outcome: outcome.decision, rule: outcome.rule, executed: outcome.executed, trace_id: tp.split('-')[1] });
     return record;
   }

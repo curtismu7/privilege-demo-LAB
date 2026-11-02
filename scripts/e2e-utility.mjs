@@ -73,6 +73,9 @@ try {
     await page.getByRole('button', { name: /^Call as/ }).click();
     const card = page.getByRole('region', { name: 'PEP decision' });
     await card.waitFor();
+    // The raw facts (deciding policy, attribution, approvers) sit under "Technical details"; open them so this script can read them.
+    const tech = card.locator('details.explain__tech > summary');
+    if (await tech.count()) await tech.first().click();
     const text = await card.innerText();
     return { card, text, badge: await card.locator('.badge').first().textContent(), rule: await card.locator('dd code').first().innerText() };
   }
@@ -114,7 +117,7 @@ try {
     const ben = await newUser('Ben');
     const priya = await newUser('Priya');
     const held = await call(ben.page, 'backlog.update_story', { storyId: 'ST-101', change: 'Move to Ready' });
-    eq(held.badge, 'Hold', 'update_story'); eq(held.rule, 'u30-hold-story-update', 'hold rule'); has(held.text, 'priya', 'approver named');
+    eq(held.badge, 'Hold', 'update_story'); eq(held.rule, 'u30-hold-story-update', 'hold rule'); has(held.text, 'Priya', 'approver named');
     await shot(ben.page, 'S62-1-held');
     await priya.page.goto(`${BASE}/approvals`);
     await priya.page.getByRole('button', { name: 'Approve backlog.update_story' }).waitFor();
@@ -199,6 +202,42 @@ try {
     await eli.page.waitForFunction(() => !document.body.innerText.includes('…'));
     has(await eli.page.locator('body').innerText(), 'Cases the grid cannot show', 'scenarios section');
     await shot(eli.page, 'policies-grid');
+    await eli.ctx.close();
+  });
+
+  // ---- Try this (this pack's list): each button fills the form without calling; Call gives the printed outcome and rule ----
+  const TRY = JSON.parse(fs.readFileSync(path.join(root, 'server/src/packs/utility/pack.json'), 'utf8')).tryThis.filter((s) => !s.exampleOnly);
+  const WORD = { allow: 'Allow', deny: 'Deny', hold: 'Hold' };
+  const cast = (t) => t.replace(/\{\{(\w+)\}\}/g, (_m, k) => k[0].toUpperCase() + k.slice(1));
+  await step('Try this: every button fills the form without calling, and Call gives the printed outcome and rule', async () => {
+    const users = {};
+    for (const s of TRY) users[s.as] ??= await newUser(cast(`{{${s.as}}}`));
+    for (const s of TRY) {
+      const { page } = users[s.as];
+      await page.goto(`${BASE}/console`);
+      await page.getByRole('button', { name: cast(s.label), exact: true }).click();
+      eq(await page.getByRole('region', { name: 'PEP decision' }).count(), 0, `${s.id}: nothing was called yet`);
+      eq(await page.locator('label.field', { hasText: /^Tool/ }).first().locator('select').inputValue(), s.tool, `${s.id}: tool filled`);
+      await page.getByRole('button', { name: /^Call as/ }).click();
+      const card = page.getByRole('region', { name: 'PEP decision' });
+      await card.waitFor();
+      eq(await card.locator('.badge').first().textContent(), WORD[s.expect.outcome], `${s.id} outcome`);
+      await card.locator('details.explain__tech > summary').first().click();
+      eq(await card.locator('dd code').first().innerText(), s.expect.rule, `${s.id} deciding rule`);
+      has((await card.innerText()).toLowerCase(), 'rules checked', `${s.id} lists the rules`); // headings are upper-cased by CSS
+    }
+    for (const u of Object.values(users)) await u.ctx.close();
+  });
+
+  // ---- the explanation card in presenter mode is bigger ----
+  await step('presenter mode grows the explanation text', async () => {
+    const eli = await newUser('Eli');
+    await call(eli.page, 'github.merge_pr', OPS);
+    const size = () => eli.page.locator('.explain').first().evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+    const before = await size();
+    await eli.page.getByRole('button', { name: 'Presenter' }).click();
+    const after = await size();
+    if (!(after > before)) throw new Error(`presenter mode did not grow the explanation text: ${before}px -> ${after}px`);
     await eli.ctx.close();
   });
 

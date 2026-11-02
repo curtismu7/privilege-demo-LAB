@@ -24,6 +24,8 @@ Rules that cut across the table:
 
 `admins` have no tool policy on purpose: administration (editing policies, making a tool drift) is a separate capability of the web app, not a tool permission. This demo does not add an admins policy beyond what the plan states.
 
+The Tool console's **Try this** buttons fill in the cases above that the shipped rules are built around (a normal fare, a large fare booked unattended, a fare over the hard cap, paying an invoice, a flight search, an analyst trying to book a fare; `web/src/data/tryThis.generic.json`), each with what to expect, and a test proves every expectation equals the real outcome. The utility pack's list is the `tryThis` array in `server/src/packs/utility/pack.json`, taken from the tables below.
+
 The AI Policies page shows this table live (it asks the real policies once per cell), so an edit to a policy changes the table.
 
 ---
