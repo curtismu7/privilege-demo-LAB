@@ -36,7 +36,7 @@
       "say": "A finance user with the payments scope gets Payments, which {{mary}} does not. Each group gets its own apps.",
       "why": "Payments needs both the group and the scope, so a finance user without the scope is denied too.",
       "blocked": {
-        "tell": "Call pay_invoice as {{mary}}. The result card says deny with the rule default-deny: no permit covers her. Search and Ticketing still work.",
+        "tell": "Call pay_invoice as {{mary}}. The result card says deny: no permit covers her (default deny; the rule id is under Technical details). Search and Ticketing still work.",
         "say": "Payments is denied with a named reason, and the other two keep working."
       }
     },

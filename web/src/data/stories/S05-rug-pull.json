@@ -40,7 +40,7 @@
     {
       "n": 4,
       "title": "Put it back",
-      "tell": "Press Reset in the AI Policies tab (admin). The drift is cleared and the call is allowed again.",
+      "tell": "Press Reset demo in the AI Policies tab (admin), then Confirm reset. The drift is cleared and the call is allowed again.",
       "say": "Here Reset just puts the tool back. In a real deployment it is trusted again only after someone reviews it and re-pins it.",
       "why": "In a real deployment re-pinning is the review step."
     }

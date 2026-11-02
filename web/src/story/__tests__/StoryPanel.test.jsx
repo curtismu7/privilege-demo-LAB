@@ -34,7 +34,7 @@ describe("StoryPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Blocked" }));
     expect(screen.getByRole("button", { name: "Blocked" })).toHaveAttribute("aria-pressed", "true");
     fireEvent.click(screen.getByRole("button", { name: /Payments/ }));
-    expect(screen.getByText(/deny with the rule default-deny/)).toBeInTheDocument();
+    expect(screen.getByText(/says deny: no permit covers her/)).toBeInTheDocument();
     expect(screen.getByText(/The result card for pay_invoice as Mary: deny/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Search is allowed/ }));
     expect(screen.getByText(/Search works, and the card names the rule/)).toBeInTheDocument();
