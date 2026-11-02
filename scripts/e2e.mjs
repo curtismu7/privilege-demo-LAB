@@ -78,6 +78,9 @@ try {
     await page.getByRole('button', { name: /^Call as/ }).click();
     const card = page.getByRole('region', { name: 'PEP decision' });
     await card.waitFor();
+    // The raw facts (deciding policy, attribution, approvers) sit under "Technical details"; open them so this script can read them.
+    const tech = card.locator('details.explain__tech > summary');
+    if (await tech.count()) await tech.first().click();
     const text = await card.innerText();
     const badge = await card.locator('.badge').first().textContent();
     const rule = await card.locator('dd code').first().innerText();
@@ -109,7 +112,7 @@ try {
     const priya = await newUser('Priya', 'Priya'); // a second, separate browser context
     const held = await call(mark.page, 'book_fare', { flightId: 'FL200', amount: 2400 }, { dot: true, justification: 'Customer rebooked after a cancellation' });
     eq(held.badge, 'Hold', 'booking by Dot'); eq(held.rule, 's01-hold-large-fare', 'hold rule');
-    has(held.text, 'priya', 'approver named');
+    has(held.text, 'Priya', 'approver named');
     await shot(mark.page, 'S01-1-mark-held');
 
     await priya.page.goto(`${BASE}/approvals`);
@@ -169,6 +172,62 @@ try {
     eq(again.badge, 'Allow', 'after restore');
     await shot(mary.page, 'S05-3-restored');
     await dana.ctx.close(); await mary.ctx.close();
+  });
+
+  // ---- Try this: each button fills in the form (no call yet); pressing Call gives exactly what is printed beside it ----
+  const TRY = JSON.parse(fs.readFileSync(path.join(root, 'web/src/data/tryThis.generic.json'), 'utf8')).filter((s) => !s.exampleOnly);
+  const NAMES = { mark: 'Mark', mary: 'Mary', priya: 'Priya' };
+  const WORD = { allow: 'Allow', deny: 'Deny', hold: 'Hold' };
+  const filled = (t) => t.replace(/\{\{(\w+)\}\}/g, (_m, k) => NAMES[k] ?? `<${k}>`);
+  await step('Try this: every button fills the form without calling, and Call gives the printed outcome and rule', async () => {
+    const users = { mark: await newUser('Mark', 'Mark'), mary: await newUser('Mary', 'Mary') };
+    for (const s of TRY) {
+      const { page } = users[s.as];
+      await page.goto(`${BASE}/console`);
+      has((await page.locator('#main').innerText()).toLowerCase(), `expect: ${WORD[s.expect.outcome].toLowerCase()}`, `${s.id} states what to expect`); // the chip is upper-cased by CSS
+      await page.getByRole('button', { name: filled(s.label), exact: true }).click();
+      eq(await page.getByRole('region', { name: 'PEP decision' }).count(), 0, `${s.id}: nothing was called yet`);
+      eq(await page.locator('label.field', { hasText: /^Tool/ }).first().locator('select').inputValue(), s.tool, `${s.id}: tool filled`);
+      eq((await page.getByLabel(/Dot \(Mark's agent\)/).isChecked()), s.agent === true, `${s.id}: agent box`);
+      await page.getByRole('button', { name: /^Call as/ }).click();
+      const card = page.getByRole('region', { name: 'PEP decision' });
+      await card.waitFor();
+      eq(await card.locator('.badge').first().textContent(), WORD[s.expect.outcome], `${s.id} outcome`);
+      await card.locator('details.explain__tech > summary').first().click();
+      eq(await card.locator('dd code').first().innerText(), s.expect.rule, `${s.id} deciding rule`);
+      has((await card.innerText()).toLowerCase(), 'rules checked', `${s.id} lists the rules`); // headings are upper-cased by CSS
+      if (s.id === 'large-fare-unattended') await shot(page, 'TRY-held-card');
+    }
+    await users.mark.ctx.close(); await users.mary.ctx.close();
+  });
+
+  // ---- the card at 375 px in light and dark, and presenter mode makes it bigger ----
+  await step('the decision card has no sideways scroll at 375 px (light and dark) and grows in presenter mode', async () => {
+    for (const theme of ['light', 'dark']) {
+      const ctx = await browser.newContext({ viewport: { width: 375, height: 800 }, colorScheme: theme });
+      await ctx.addInitScript((t) => { try { localStorage.setItem('privdemo.theme', t); } catch { /* none */ } }, theme);
+      const page = await ctx.newPage();
+      page.on('console', (m) => { if (m.type() === 'error') consoleProblems.push(`375 ${theme}: ${m.text()}`); });
+      page.on('pageerror', (e) => consoleProblems.push(`375 ${theme}: uncaught ${e.message}`));
+      await page.goto(`${BASE}/`);
+      await page.getByRole('button', { name: /^Mark/i }).click();
+      await page.getByTestId('shell-user').waitFor();
+      await call(page, 'book_fare', { flightId: 'FL200', amount: 12000 });
+      const wide = async (what) => { const w = await page.evaluate(() => [document.documentElement.scrollWidth, window.innerWidth]); if (w[0] > w[1] + 1) throw new Error(`${what} (${theme}) scrolls sideways: ${w[0]} > ${w[1]}`); };
+      await wide('console with a decision');
+      await shot(page, `375-${theme}-console`);
+      for (const p of ['/policies', '/approvals', '/trace']) { await page.goto(`${BASE}${p}`); await page.waitForLoadState('networkidle'); await wide(p); }
+      await page.goto(`${BASE}/console`);
+      await ctx.close();
+    }
+    const mark = await newUser('Mark', 'Mark');
+    await call(mark.page, 'book_fare', { flightId: 'FL200', amount: 12000 });
+    const size = () => mark.page.locator('.explain').first().evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+    const before = await size();
+    await mark.page.getByRole('button', { name: 'Presenter' }).click();
+    const after = await size();
+    if (!(after > before)) throw new Error(`presenter mode did not grow the explanation text: ${before}px -> ${after}px`);
+    await mark.ctx.close();
   });
 
   // ---- the other pages render ----

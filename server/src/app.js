@@ -24,6 +24,7 @@ import { createAudit } from './audit.js';
 import { createPreflight } from './preflight.js';
 import { createTracer } from './trace/hops.js';
 import { createSink, parseTraceparent, newTraceparent } from './trace/index.js';
+import { createExplainer, createExplanationStore } from './explain/index.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const WEB_DIST = process.env.WEB_DIST || path.join(ROOT, 'web/dist');
@@ -51,6 +52,8 @@ export function createApp({ cfg = config(), now = () => Date.now(), fetchImpl = 
   const { personas: PERSONAS, agent: AGENT } = pack;
   const customer = loadCustomerConfig({ file: customerFile });
   app.locals.customerWarnings = customer.warnings;
+  // The plain-English "why" of decisions and policies (explain/). Stateless; it only reads the policy set it is handed.
+  const explainer = createExplainer({ pack, customer, mode });
 
   // The netguard is the only door out: nothing leaves the process in mock mode; live mode reaches only the configured PingFederate.
   const netguard = createNetguard({ mode, liveOrigin: () => { try { return new URL(cfg.pfJwksUrl || cfg.pfUrl).origin; } catch { return null; } }, realFetch: fetchImpl });
@@ -70,22 +73,28 @@ export function createApp({ cfg = config(), now = () => Date.now(), fetchImpl = 
       const tracer = createTracer({ sink, now });
       const audit = createAudit({ dataDir: dir, now });
       const backend = createBackend({ tools: pack.tools });
+      const explanations = createExplanationStore({ size: 500 });
       const store = createPolicyStore({ dataDir: dir, pack });
       const approvals = createApprovals({
         now, ttlMs: cfg.approvalTtlMs,
         onExpire(r) {
           const tp = tracer.emit(r.traceparent, { hop: 'approval', subject: r.claims.sub, ...(pack.attribution ? { actor: r.claims.act?.sub ? { sub: r.claims.act.sub } : null, tool: r.tool } : {}), decision: { result: 'deny', rule: 'approval-expired', reason: 'expired without an answer' } }).traceparent;
           r.traceparent = tp;
+          try {
+            const explanation = explainer.forAnswer({ status: 'expired', claims: r.claims, tool: r.tool, app: r.app, args: r.args, approverSubs: r.approvers });
+            r.outcome.explanation = explanation;
+            explanations.put(tp.split('-')[2], explanation);
+          } catch { /* an explanation must not break the queue */ }
           audit.write({ kind: 'approval', approval_id: r.id, sub: r.claims.sub, tool: r.tool, approved: false, outcome: 'deny', rule: 'approval-expired', executed: false, trace_id: tp.split('-')[1] });
         },
       });
-      const pep = createPep({ backend, store, approvals, tracer, audit, now, attribution: pack.attribution });
-      return { id, dir, sink, tracer, audit, backend, store, approvals, pep };
+      const pep = createPep({ backend, store, approvals, tracer, audit, now, attribution: pack.attribution, explainer, explanations });
+      return { id, dir, sink, tracer, audit, backend, store, approvals, pep, explanations };
     },
     // Run state of one workspace: policies back to the shipped set, no approvals, no drift, an empty trace. Sign-ins and settings stay.
     reset(ws) {
       const cleared = { approvals: ws.approvals.list().length, traceEvents: ws.sink.list().length, driftedTools: ws.backend.driftedTools().length };
-      ws.store.reset(); ws.approvals.clear(); ws.backend.resetDrift(); ws.sink.clear();
+      ws.store.reset(); ws.approvals.clear(); ws.backend.resetDrift(); ws.sink.clear(); ws.explanations.clear();
       ws.audit.write({ kind: 'reset' });
       return { workspace: ws.id, cleared };
     },
@@ -312,7 +321,17 @@ export function createApp({ cfg = config(), now = () => Date.now(), fetchImpl = 
   const problemsOut = (problems) => problems.map((p) => ({ policyId: p.policyId ?? null, message: p.message }));
   app.get('/api/policies', authed({}, (req, res) => {
     const { store } = wsOf(req);
-    res.json({ policies: store.list(), error: store.activeError() ? problemsOut(store.activeError()) : null });
+    // `meaning` is computed from each row's saved text on every request, so it always follows an edit.
+    res.json({ policies: store.list().map((p) => ({ ...p, meaning: explainer.meaning(p) })), error: store.activeError() ? problemsOut(store.activeError()) : null });
+  }));
+  // The meaning of unsaved editor text (a preview). Problems come back as a normal 200 so typing does not fill the console with errors.
+  app.post('/api/policies/explain', adminOnly({}, (req, res) => {
+    const { store } = wsOf(req);
+    const { id, text, state = 'active' } = req.body ?? {};
+    if (typeof id !== 'string' || typeof text !== 'string') return res.status(400).json({ error: 'id_and_text_required' });
+    const v = store.validate({ [id]: text });
+    if (!v.ok) return res.json({ ok: false, problems: problemsOut(v.problems) });
+    return res.json({ ok: true, meaning: explainer.meaning({ id, state: state === 'candidate' ? 'candidate' : 'active', text }) });
   }));
   app.post('/api/policies/validate', adminOnly({}, (req, res) => {
     const { store } = wsOf(req);
@@ -344,7 +363,7 @@ export function createApp({ cfg = config(), now = () => Date.now(), fetchImpl = 
   // Synthetic request -> full decision, plus what the staged Candidate policies would change. Runs nothing, holds nothing.
   app.post('/api/decide-test', authed({}, (req, res) => {
     const { store, backend } = wsOf(req);
-    const { claims, tool, args = {}, approvalCount = 0, drift = false } = req.body ?? {};
+    const { claims, tool, args = {}, approvalCount = 0, drift = false, explain = false } = req.body ?? {};
     const def = typeof tool === 'string' ? backend.tool(tool) : null;
     if (!def) return res.status(400).json({ error: 'unknown_tool', tools: backend.names() });
     if (!Number.isSafeInteger(approvalCount) || approvalCount < 0 || approvalCount > 100) return res.status(400).json({ error: 'bad_approval_count' });
@@ -358,7 +377,10 @@ export function createApp({ cfg = config(), now = () => Date.now(), fetchImpl = 
     const cand = store.candidateSet();
     const shadow = cand ? { candidates: cand.ids, active: { outcome: active.outcome, rule: active.rule }, candidate: shape(cand.policySet) } : null;
     if (shadow) shadow.changed = shadow.candidate.outcome !== active.outcome || shadow.candidate.rule !== active.rule;
-    res.json({ ...active, shadow });
+    // explain:true adds the plain-English "why". Off by default: the group x tool grid asks for dozens of decisions at once.
+    // Its outcome is what the console would answer (a hold only if an approval could lead to allow); `outcome` above is unchanged.
+    const explanation = explain === true && store.activeSet() ? explainer.forCall({ policySet: store.activeSet(), ...common, source: 'test' }) : undefined;
+    res.json({ ...active, shadow, ...(explanation ? { explanation } : {}) });
   }));
 
   // ---- demo controls ----
@@ -379,7 +401,22 @@ export function createApp({ cfg = config(), now = () => Date.now(), fetchImpl = 
     return res.json({ ok: true, ...workspaces.reset(req.params.workspace) });
   }));
 
-  app.get('/api/trace', authed({}, (req, res) => res.json({ events: wsOf(req).sink.list({ trace_id: typeof req.query.trace_id === 'string' ? req.query.trace_id : undefined }) })));
+  // The events are untouched (the envelope has no explanation field); the plain-English "why" of the pep and approval hops rides beside them, keyed by span id.
+  app.get('/api/trace', authed({}, (req, res) => {
+    const ws = wsOf(req);
+    const events = ws.sink.list({ trace_id: typeof req.query.trace_id === 'string' ? req.query.trace_id : undefined });
+    // The explanation carries amounts, groups and scopes, so it is shown only to the people /api/approvals shows the same call to:
+    // the requester, a named approver and an admin.
+    const me = req.principal.claims;
+    const visible = new Set(ws.approvals.list().filter((r) => mine(me, r)).map((r) => String(r.traceparent).split('-')[1]));
+    const explanations = {};
+    for (const e of events) {
+      const x = e.hop === 'pep' || e.hop === 'approval' ? ws.explanations.get(e.span_id) : null;
+      const seen = isAdmin(me) || e.subject === me.sub || visible.has(e.trace_id);
+      if (x && seen) explanations[e.span_id] = x;
+    }
+    res.json({ events, explanations });
+  }));
 
   app.use('/api', (_req, res) => res.status(404).json({ error: 'not_found' }));
 

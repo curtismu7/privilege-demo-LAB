@@ -1,0 +1,164 @@
+{
+  "v": 1,
+  "outcome": "hold",
+  "kind": "held",
+  "headline": "Held. Priya must approve this before book_fare runs.",
+  "who": {
+    "sub": "mark",
+    "name": "Mark",
+    "groups": [
+      "travel-agents"
+    ],
+    "groupsMore": 0,
+    "scopes": [
+      "tools:invoke"
+    ],
+    "scopesMore": 0,
+    "agent": {
+      "sub": "dot",
+      "name": "Dot"
+    },
+    "via": "a mock sign-in (persona)",
+    "text": "Mark, in the group travel-agents, with the scope tools:invoke. Dot is acting for Mark. Signed in with a mock sign-in (persona)."
+  },
+  "asked": {
+    "tool": "book_fare",
+    "app": "booking",
+    "attended": false,
+    "attendedText": "unattended: Dot made the call for Mark (the token carries an agent)",
+    "details": [
+      {
+        "label": "amount",
+        "value": "2400"
+      }
+    ],
+    "approvalsSoFar": 0,
+    "schemaChanged": false,
+    "text": "book_fare (booking app), amount 2400. Unattended: Dot made the call for Mark. Approvals so far: 0. Tool schema: matches the approved version."
+  },
+  "why": "The rule “Fares over 1000 need a second pair of eyes” (s01-hold-large-fare) says: Holds unattended calls to the book_fare tool when an amount is given and the amount is over 1000, until Priya approves. It stops applying once someone has approved the call. This request fits it and has 0 approvals so far, so it is held for Priya.",
+  "decidedBy": {
+    "id": "s01-hold-large-fare",
+    "kind": "hold",
+    "reason": "Fares over 1000 need a second pair of eyes",
+    "does": "Holds unattended calls to the book_fare tool when an amount is given and the amount is over 1000, until Priya approves. It stops applying once someone has approved the call."
+  },
+  "rules": [
+    {
+      "id": "s01-hold-large-fare",
+      "kind": "hold",
+      "reason": "Fares over 1000 need a second pair of eyes",
+      "status": "held",
+      "statusText": "Held it for approval",
+      "because": [
+        "the call is unattended (Dot acts for Mark)",
+        "an amount is given",
+        "the amount 2400 is over 1000",
+        "nobody has approved it yet"
+      ],
+      "deciding": true,
+      "oneLine": "Holds unattended calls to the book_fare tool when an amount is given and the amount is over 1000, until Priya approves. It stops applying once someone has approved the call.",
+      "explainedFrom": "structure"
+    },
+    {
+      "id": "s23-permit-travel-agents",
+      "kind": "allow",
+      "reason": "Travel agents may book fares",
+      "status": "overridden",
+      "statusText": "Would allow it once the hold is cleared",
+      "because": [],
+      "deciding": false,
+      "oneLine": "Lets people in the travel-agents group make calls (attended or unattended) to tools in the booking app.",
+      "explainedFrom": "structure"
+    },
+    {
+      "id": "s05-rugpull-pin",
+      "kind": "block",
+      "reason": "Tool schema changed since it was approved",
+      "status": "not-applied",
+      "statusText": "Did not apply",
+      "because": [
+        "the tool still matches the version that was approved"
+      ],
+      "deciding": false,
+      "oneLine": "Blocks any call to any tool when the tool's description or schema has changed since it was approved.",
+      "explainedFrom": "structure"
+    },
+    {
+      "id": "s23-forbid-over-cap",
+      "kind": "block",
+      "reason": "Hard cap: no booking over 10000 for anyone",
+      "status": "not-applied",
+      "statusText": "Did not apply",
+      "because": [
+        "the amount 2400 is not over 10000"
+      ],
+      "deciding": false,
+      "oneLine": "Blocks calls (attended or unattended) to the book_fare tool when an amount is given and the amount is over 10000.",
+      "explainedFrom": "structure"
+    },
+    {
+      "id": "s04-analysts-search-ticketing",
+      "kind": "allow",
+      "reason": "Analysts may use Search and Ticketing",
+      "status": "not-about-tool",
+      "statusText": "Not about this tool",
+      "because": [
+        "this rule is about the search and ticketing apps, not the booking app"
+      ],
+      "deciding": false,
+      "oneLine": "Lets people in the analysts group make attended calls to tools in the search or ticketing app.",
+      "explainedFrom": "structure"
+    },
+    {
+      "id": "s04-payments-finance-only",
+      "kind": "allow",
+      "reason": "Payments is for finance, with the payments:write scope",
+      "status": "not-about-tool",
+      "statusText": "Not about this tool",
+      "because": [
+        "this rule is about the payments app, not the booking app"
+      ],
+      "deciding": false,
+      "oneLine": "Lets people in the finance group make attended calls to tools in the payments app when the token has the payments:write scope.",
+      "explainedFrom": "structure"
+    }
+  ],
+  "change": {
+    "text": "Priya approves it on the Approvals page.",
+    "items": [],
+    "complete": true
+  },
+  "approval": {
+    "approvers": [
+      {
+        "sub": "priya",
+        "name": "Priya"
+      }
+    ],
+    "where": "/approvals",
+    "requesterMayApprove": false,
+    "approvalWouldAllow": true,
+    "text": "Priya can approve it on the Approvals page (sign in as Priya). Approving checks the rules again with one approval recorded and runs book_fare once."
+  },
+  "before": null,
+  "notes": [
+    "Rules look at the person's groups. The agent's own groups are not used."
+  ],
+  "checks": {
+    "agreed": true,
+    "rules": 6,
+    "clauses": 26
+  },
+  "technical": {
+    "rule": "s01-hold-large-fare",
+    "reason": "Fares over 1000 need a second pair of eyes",
+    "rules": [
+      "s01-hold-large-fare"
+    ],
+    "overridden": [
+      "s23-permit-travel-agents"
+    ],
+    "engine": "4.14.0"
+  }
+}

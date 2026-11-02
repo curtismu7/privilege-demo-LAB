@@ -1,0 +1,98 @@
+[
+  {
+    "id": "normal-fare",
+    "label": "{{mark}} books a normal fare",
+    "as": "mark",
+    "tool": "book_fare",
+    "args": { "flightId": "FL200", "amount": 800 },
+    "agent": false,
+    "note": "Allowed: travel agents may book fares, and 800 is under every limit.",
+    "expect": { "outcome": "allow", "rule": "s23-permit-travel-agents" }
+  },
+  {
+    "id": "large-fare-unattended",
+    "label": "{{mark}}'s agent books a large fare, unattended",
+    "as": "mark",
+    "tool": "book_fare",
+    "args": { "flightId": "FL200", "amount": 2400 },
+    "agent": true,
+    "note": "Held until {{priya}} approves it on the Approvals page.",
+    "expect": { "outcome": "hold", "rule": "s01-hold-large-fare", "approvers": ["priya"] }
+  },
+  {
+    "id": "over-cap",
+    "label": "{{mark}} books a fare over the hard cap",
+    "as": "mark",
+    "tool": "book_fare",
+    "args": { "flightId": "FL200", "amount": 12000 },
+    "agent": false,
+    "note": "Denied for everyone over 10000. An approval cannot change this.",
+    "expect": { "outcome": "deny", "rule": "s23-forbid-over-cap" }
+  },
+  {
+    "id": "pay-invoice",
+    "label": "{{mark}} pays an invoice",
+    "as": "mark",
+    "tool": "pay_invoice",
+    "args": { "invoiceId": "INV-1001", "amount": 250 },
+    "agent": false,
+    "note": "Denied: only the finance group may pay invoices, and nobody in this demo is in finance.",
+    "expect": { "outcome": "deny", "rule": "default-deny" }
+  },
+  {
+    "id": "search-flights",
+    "label": "{{mary}} searches flights",
+    "as": "mary",
+    "tool": "search_flights",
+    "args": { "query": "SFO to JFK" },
+    "agent": false,
+    "note": "Allowed: analysts may search.",
+    "expect": { "outcome": "allow", "rule": "s04-analysts-search-ticketing" }
+  },
+  {
+    "id": "analyst-books-fare",
+    "label": "{{mary}} tries to book a fare",
+    "as": "mary",
+    "tool": "book_fare",
+    "args": { "flightId": "FL200", "amount": 800 },
+    "agent": false,
+    "note": "Denied: analysts may search and open tickets, but only travel agents may book fares.",
+    "expect": { "outcome": "deny", "rule": "default-deny" }
+  },
+  {
+    "id": "probe-schema-changed",
+    "label": "{{mark}} books a fare after the tool's schema changed",
+    "as": "mark",
+    "tool": "book_fare",
+    "args": { "flightId": "FL200", "amount": 500 },
+    "agent": false,
+    "drift": true,
+    "exampleOnly": true,
+    "note": "Denied: a tool whose description or schema changed since it was approved is blocked for everyone.",
+    "expect": { "outcome": "deny", "rule": "s05-rugpull-pin" }
+  },
+  {
+    "id": "probe-finance-pays",
+    "label": "A finance user with the payments:write scope pays an invoice",
+    "as": "mark",
+    "testUser": "finance",
+    "tool": "pay_invoice",
+    "args": { "invoiceId": "INV-1001", "amount": 250 },
+    "agent": false,
+    "exampleOnly": true,
+    "note": "Allowed: finance may pay invoices with the payments:write scope.",
+    "expect": { "outcome": "allow", "rule": "s04-payments-finance-only" }
+  },
+  {
+    "id": "probe-large-fare-approved",
+    "label": "The same large fare after {{priya}} approves (one approval)",
+    "as": "mark",
+    "tool": "book_fare",
+    "args": { "flightId": "FL200", "amount": 2400 },
+    "agent": true,
+    "approvalCount": 1,
+    "exampleOnly": true,
+    "note": "Allowed once someone has approved: the hold rule stops applying.",
+    "expect": { "outcome": "allow", "rule": "s23-permit-travel-agents" }
+  }
+]

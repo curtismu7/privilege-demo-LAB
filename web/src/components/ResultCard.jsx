@@ -1,13 +1,15 @@
 import Badge from "./Badge";
+import Explanation from "./Explanation";
 
 // One decision, as the PEP or the test panel returned it: outcome, deciding policy and its reason, what it overrode.
 export default function ResultCard({ title, res, children }) {
   if (!res) return null;
-  const outcome = res.outcome ?? res.decision;
+  // With the server's explanation, the plain-English card leads and the raw facts fold into "Technical details". Without one (an older
+  // server, a failed request) the card is the original facts list.
+  const ex = res.explanation && !res.explanation.error && res.explanation.v === 1 ? res.explanation : null;
+  const outcome = ex ? ex.outcome : res.outcome ?? res.decision;
   const overridden = res.overridden ?? [];
-  return (
-    <section className="result" data-state={outcome} aria-label={title}>
-      <h3 className="result__head">{title} <Badge kind={outcome} /></h3>
+  const facts = (
       <dl className="result__facts">
         <dt>Deciding policy</dt><dd><code>{res.rule}</code></dd>
         <dt>Reason</dt><dd>{res.reason}</dd>
@@ -18,6 +20,16 @@ export default function ResultCard({ title, res, children }) {
         {res.approvers?.length > 0 && (<><dt>Approvers</dt><dd>{res.approvers.join(", ")}</dd></>)}
         {res.approvalId && (<><dt>Approval</dt><dd><a href="/approvals">Open Approvals</a> <code>{res.approvalId.slice(0, 8)}</code></dd></>)}
       </dl>
+  );
+  return (
+    <section className="result" data-state={outcome} aria-label={title}>
+      <h3 className="result__head">{ex ? "Decision" : title} {ex && <small className="muted result__gloss">(checked by the PEP, the decision checkpoint every call passes through)</small>} <Badge kind={outcome} /></h3>
+      {ex ? (
+        <>
+          <Explanation explanation={ex} showTechnical={false} />
+          <details className="explain__tech"><summary>Technical details</summary>{facts}</details>
+        </>
+      ) : facts}
       {res.problems?.length > 0 && (
         <ul className="problems" aria-label="Problems">
           {res.problems.map((p, i) => <li key={i}>{typeof p === "string" ? p : p.message}</li>)}

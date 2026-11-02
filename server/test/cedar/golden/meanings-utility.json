@@ -1,0 +1,15 @@
+{
+  "s05-rugpull-pin": "Blocks any call to any tool when the tool's description or schema has changed since it was approved.",
+  "u10-engineers-pr-review": "Lets people in the engineers group make calls (attended or unattended) to the github.read_pr and github.post_review_comment tools.",
+  "u11-engineers-research": "Lets people in the engineers group make calls (attended or unattended) to the kb.search and cloudwatch.query_logs tools.",
+  "u12-governance-review": "Lets people in the governance-reviewers group make calls (attended or unattended) to the github.read_pr, github.post_review_comment, kb.search and confluence.update_requirement tools.",
+  "u13-analysts-backlog": "Lets people in the business-analysts group make calls (attended or unattended) to the backlog.create_story_draft, backlog.update_story, confluence.update_requirement and kb.search tools.",
+  "u14-compliance-evidence": "Lets people in the compliance group make calls (attended or unattended) to the github.read_pr, kb.search and cloudwatch.query_logs tools.",
+  "u20-never-merge-or-approve-pr": "Blocks calls (attended or unattended) to the github.merge_pr and github.approve_pr tools.",
+  "u21-never-change-policy": "Blocks calls (attended or unattended) to the policy.change tool.",
+  "u22-never-deploy": "Blocks calls (attended or unattended) to any tool when the tool name starts with “deploy.”.",
+  "u30-hold-story-update": "Holds calls (attended or unattended) to the backlog.update_story tool, until Priya approves. It stops applying once someone has approved the call.",
+  "u31-hold-requirement-update": "Holds calls (attended or unattended) to the confluence.update_requirement tool, until Priya approves. It stops applying once someone has approved the call.",
+  "u40-repo-scope-engineers": "Blocks calls (attended or unattended) from people in the engineers group to any tool when the call names a repository, unless the repository is one of grid-ops-portal, outage-notifier.",
+  "u41-restricted-evidence-compliance-only": "Blocks calls (attended or unattended) to any tool when the data is classified restricted, unless the person is in the compliance group."
+}

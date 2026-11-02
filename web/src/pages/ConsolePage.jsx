@@ -1,17 +1,30 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { PERSONAS, api } from "../api";
 import { usePack } from "../pack";
+import { useCastName } from "../customer";
+import { useTryThis } from "../tryThis";
 import { useSession } from "../session";
 import ArgFields, { defaultArgs } from "../components/ArgFields";
 import Badge from "../components/Badge";
+import Glossary from "../components/Glossary";
+import HowItWorks from "../components/HowItWorks";
+import TryThis from "../components/TryThis";
 import MockToken from "../components/MockToken";
 import RequireSignIn from "../components/RequireSignIn";
 import ResultCard from "../components/ResultCard";
 import { PageStories } from "../story/StoryPanel";
 
+const titleCase = (s) => String(s).split(/[-_\s]+/).filter(Boolean).map((w) => w[0].toUpperCase() + w.slice(1)).join(" ");
+
 function Console() {
-  const { me } = useSession();
+  const { me, config } = useSession();
   const pack = usePack();
+  const castName = useCastName();
+  const agentName = castName("agent", titleCase(pack.agent.sub));
+  const scenarios = useTryThis();
+  const agentHelp = useId();
+  const callRef = useRef(null);
+  const [filled, setFilled] = useState("");
   const name = me?.name ?? PERSONAS[me?.persona]?.name ?? me?.sub;
   const startTool = pack.id === "generic" ? "search_flights" : pack.toolNames[0];
   const [tools, setTools] = useState([]);
@@ -28,6 +41,12 @@ function Console() {
   const tool = tools.find((t) => t.name === toolName);
 
   const pickTool = (n) => { setToolName(n); setArgs(defaultArgs({ name: n }, pack.argDefaults)); setRes(null); };
+  // A Try-this button only fills in the form: the person stays the signed-in one, and nothing is sent until Call is pressed.
+  const fill = (s) => {
+    setToolName(s.tool); setArgs({ ...s.args }); setAsAgent(s.agent === true); setJustification(""); setRes(null);
+    setFilled(`Filled in: ${s.label}. Press “Call as ${name}” to run it.`);
+    callRef.current?.focus();
+  };
   const call = async () => {
     setBusy(true);
     const body = { tool: toolName, args, ...(asAgent ? { asAgent: true } : {}), ...(justification.trim() ? { justification: justification.trim() } : {}) };
@@ -45,7 +64,10 @@ function Console() {
     <main className="page">
       <h1>Tool console</h1>
       <p className="lede">Make a tool call as <strong>{name}</strong>. It goes through the policy enforcement point, which asks Cedar and then runs the tool, refuses it, or holds it for a person.</p>
+      <HowItWorks />
       <PageStories page="console" />
+      <TryThis scenarios={scenarios} me={me} mode={config?.mode} tools={tools} onFill={fill} />
+      <p role="status" className="muted">{filled}</p>
       <div className="cols">
         <section className="card" aria-labelledby="call-h">
           <h2 id="call-h">Call a tool</h2>
@@ -55,11 +77,12 @@ function Console() {
             </select>
           </label>
           <ArgFields tool={tool} args={args} onChange={setArgs} />
-          <label className="check"><input type="checkbox" checked={asAgent} onChange={(e) => setAsAgent(e.target.checked)} />{pack.agent.label}</label>
+          <label className="check"><input type="checkbox" checked={asAgent} aria-describedby={agentHelp} onChange={(e) => setAsAgent(e.target.checked)} />{pack.agent.label}</label>
+          <p id={agentHelp} className="field-hint muted">Tick this to let {agentName} make the call for you. A call made by an agent is unattended, and some rules only look at unattended calls.</p>
           <label className="field">Justification (shown to an approver; never read by the policy)
             <input type="text" maxLength={500} value={justification} onChange={(e) => setJustification(e.target.value)} />
           </label>
-          <div className="row"><button type="button" className="primary" onClick={call} disabled={busy || !tool}>Call as {name}</button></div>
+          <div className="row"><button type="button" className="primary" ref={callRef} onClick={call} disabled={busy || !tool}>Call as {name}</button></div>
           <div aria-live="polite"><ResultCard title="PEP decision" res={res} /></div>
         </section>
 
@@ -83,6 +106,7 @@ function Console() {
         </section>
       </div>
       <MockToken />
+      <Glossary />
     </main>
   );
 }

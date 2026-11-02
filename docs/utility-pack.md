@@ -23,3 +23,7 @@ JSON-RPC 2.0 over `POST /mcp`, `Authorization: Bearer <PF access token>` with `s
 - A shelf override entry (in the shelf's own local file, not in this repo) would be a second `privilege-demo`-style entry with `PACK=utility` in its environment and port 4762.
 - Content-pack checklist when editing: change a policy (`server/src/packs/utility/policies`), then its row in `docs/group-to-tool-mapping.md` (utility section), then the story text (`web/src/data/packs/utility/stories`), then the mutation table in `server/test/cedar/utility-pack.test.js`. A test fails if a story names a policy or tool that no longer exists.
 - Browser check: `npm run build && npm run e2e:utility` (default port 4762, `E2E_PORT` to change).
+
+## Try this and the explanations
+
+The Tool console's **Try this** buttons for this pack are the `tryThis` array in `pack.json` (twelve buttons that follow the tables in `group-to-tool-mapping.md`, plus two example-only requests used for the rule examples). Every decision card explains itself: who is asking, the repository and data classification when a rule reads them, and each rule's status. `server/test/app/tryit.test.js` proves every printed expectation against the real app.
