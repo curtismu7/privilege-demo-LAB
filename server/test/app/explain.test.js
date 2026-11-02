@@ -177,9 +177,9 @@ describe('the MCP door and other pinned shapes', () => {
     const body = { claims: { sub: 'mary', groups: ['analysts'], scope: 'tools:invoke', client_id: 'c', act: { sub: 'dot' } }, tool: 'book_fare', args: fare(2400) };
     const plain = (await mark.post('/api/decide-test').send(body)).body;
     expect(plain.explanation).toBeUndefined();
-    expect(plain.outcome).toBe('hold'); // decide-test's own answer is unchanged
+    expect(plain.outcome).toBe('deny'); // same as the console: no approval could lead to allow
     const asked = (await mark.post('/api/decide-test').send({ ...body, explain: true })).body;
-    expect(asked.outcome).toBe('hold');
+    expect(asked.outcome).toBe('deny');
     expect(asked.explanation).toMatchObject({ outcome: 'deny', kind: 'hold-no-way-through', who: { via: 'details typed into Test a request' } });
     const console_ = await signedIn(mockApp(), 'mary');
     expect((await call(console_, 'book_fare', fare(2400), { asAgent: true })).body.outcome).toBe('deny');

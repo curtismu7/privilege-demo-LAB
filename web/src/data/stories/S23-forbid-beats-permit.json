@@ -20,16 +20,16 @@
       "title": "Test a booking",
       "tell": "In Test a request pick {{mark}}, book_fare, amount 500. Allow, decided by s23-permit-travel-agents.",
       "say": "Within the cap the permit decides.",
-      "why": "Only the permit matches, so it is the deciding policy.",
+      "why": "Within the cap only the permit matches and decides. Over it, both match, and the forbid beats the permit.",
       "blocked": {
-        "tell": "Change the amount to 12000. Deny, decided by s23-forbid-over-cap, and the card lists s23-permit-travel-agents as overridden.",
+        "tell": "Change the amount to 12000. Deny, decided by s23-forbid-over-cap, and s23-permit-travel-agents is shown under Also applied as \"Would have allowed it, but a block rule beat it\".",
         "say": "The permit still matches. The forbid wins, and the card shows both."
       }
     },
     {
       "n": 3,
       "title": "An approval cannot clear a cap",
-      "tell": "Tick that Dot acts and make the call at $12,000. Deny, and the deciding policy is s23-forbid-over-cap, not the hold rule; the hold rule is listed under All forbids that fired. At $2,400 the same call is held for approval, and once approved it is allowed.",
+      "tell": "Tick that Dot acts and make the call at $12,000. Deny, and the deciding policy is s23-forbid-over-cap, not the hold rule; the hold rule s01-hold-large-fare is shown under Also applied as \"Would hold it, but the call is denied anyway\". At $2,400 the same call is held for approval, and once approved it is allowed.",
       "say": "A human can lift a limit that names an approver. This one names nobody, so it is final.",
       "why": "Only a forbid with @approvers becomes a hold, and only when every forbid that fired has them. The cap has none, so it is final."
     },
@@ -43,6 +43,6 @@
   ],
   "proof": {
     "happy": "The result card for 500: allow by s23-permit-travel-agents, nothing overridden.",
-    "blocked": "The result card for 12000: deny by s23-forbid-over-cap with the permit listed under overridden."
+    "blocked": "The result card for 12000: deny by s23-forbid-over-cap, with the permit shown under Also applied as beaten by a block rule."
   }
 }

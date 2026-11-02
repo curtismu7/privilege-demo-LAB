@@ -289,7 +289,7 @@
     {
       "id": "S04",
       "title": "Mary gets 2 of 3 tools",
-      "say": "The agent only gets what Mary is allowed to use, so it cannot be tricked into asking for more.",
+      "say": "Policy decides tool by tool from Mary's token, so she only gets what she is allowed to use.",
       "file": "web/src/data/stories/S04-two-of-three-tools.json"
     },
     {

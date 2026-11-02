@@ -370,15 +370,19 @@ export function createApp({ cfg = config(), now = () => Date.now(), fetchImpl = 
     const common = { claims, tool, app: def.app, args, approvalCount, pinnedHash: backend.pinnedHash(tool), observedHash: drift === true ? 'drifted' : backend.observedHash(tool), resource: backend.resourceAttrs(tool, args) };
     const shape = (policySet) => {
       const d = evaluate({ policySet, ...common });
-      return { outcome: classify(d, policySet), decision: d.decision, rule: d.rule, rules: d.rules, overridden: d.overridden, reason: d.reason, problems: d.problems,
-        approvers: [...new Set(d.rules.flatMap((r) => approversOf(policySet, r)))] };
+      // Same rule as the console: a hold only counts if an approval could end in allow, otherwise it is a plain deny.
+      const kind = classify(d, policySet);
+      const approvable = kind === 'hold' && evaluate({ policySet, ...common, approvalCount: Math.max(approvalCount, 1) }).decision === 'allow';
+      const outcome = kind === 'hold' && !approvable ? 'deny' : kind;
+      return { outcome, decision: d.decision, rule: d.rule, rules: d.rules, overridden: d.overridden, reason: d.reason, problems: d.problems,
+        approvers: outcome === 'hold' ? [...new Set(d.rules.flatMap((r) => approversOf(policySet, r)))] : [] };
     };
     const active = shape(store.activeSet());
     const cand = store.candidateSet();
     const shadow = cand ? { candidates: cand.ids, active: { outcome: active.outcome, rule: active.rule }, candidate: shape(cand.policySet) } : null;
     if (shadow) shadow.changed = shadow.candidate.outcome !== active.outcome || shadow.candidate.rule !== active.rule;
     // explain:true adds the plain-English "why". Off by default: the group x tool grid asks for dozens of decisions at once.
-    // Its outcome is what the console would answer (a hold only if an approval could lead to allow); `outcome` above is unchanged.
+    // `outcome` above is what the console would answer too (a hold only if an approval could lead to allow).
     const explanation = explain === true && store.activeSet() ? explainer.forCall({ policySet: store.activeSet(), ...common, source: 'test' }) : undefined;
     res.json({ ...active, shadow, ...(explanation ? { explanation } : {}) });
   }));
