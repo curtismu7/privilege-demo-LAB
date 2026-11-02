@@ -70,9 +70,29 @@ The PEP turns it into one of three outcomes. A deny becomes **hold** only when e
 | hold | 202 with `approvalId`, `approvers` | error `-32004`, `data.approvalId` |
 | deny | 403 with `rule`, `reason` | error `-32003`, `data.rule` |
 
+## The explanation object
+
+`pep.enforce()` and the routes add an optional `explanation` (see `server/src/explain/`). It is built after the outcome is known, inside a guard: if building fails the decision is unchanged and the explanation is `{ v: 1, error: true, ... }`.
+
+```
+{ v: 1, outcome, kind: allowed | default-deny | blocked | held | hold-no-way-through | before-rules | approval-denied | approval-expired,
+  headline, why,
+  who:   { name, groups, scopes, agent, via, text },
+  asked: { tool, app, attended, attendedText, details, approvalsSoFar, schemaChanged, text },
+  decidedBy: { id, kind: allow | block | hold | default, reason, does } | null,
+  rules: [ { id, kind, reason, status, statusText, because: [string], deciding, oneLine, explainedFrom: structure | text } ],
+  change: { text, items, complete } | null,   approval: { approvers, where, approvalWouldAllow, text } | null,
+  before: { code, problems } | null,          notes: [string],
+  checks: { agreed, rules, clauses },         technical: { rule, reason, rules, overridden, engine } }
+```
+
+How it is made: each active policy is taken apart (`cedar.policyToJson`) into permit-only pieces: the whole policy, each scope part, and each `when` / `unless` condition (a top-level `&&` is split into its conjuncts). One more `isAuthorized` call over those pieces, with the same schema, entities and context `decide()` builds, returns in `diagnostics.reason` every piece that holds and in `diagnostics.errors` every piece that errored. That says, for each rule, whether it applied and which part did not hold. The sentences come from fixed templates over the clause shapes in `clauses.js`; real values (the amount, the group, the scope) come from the request. The reading is then compared with `decide()`'s `decision`, `rules` and `overridden`; any difference sets `checks.agreed = false`, drops every `because`, and adds a note. The per-policy work is cached per policy set, which is a new object on every edit, so an edit changes the next explanation. Only active policies are explained (a Candidate stays in the shadow diff). Above 400 pieces the explanation degrades to whole rules.
+
+`explanation.outcome` is the PEP's final outcome. `POST /api/decide-test` still returns its own `outcome` (a hold even where the console would deny because no allow rule remains after an approval); with `explain: true` the explanation says which the console would answer.
+
 ## Trace
 
-Each request gets a W3C `traceparent` (an incoming valid one is continued). Hops, in order: `auth` (token verified or refused), `policy:ai-policy` (Cedar, with latency), `tool` (only when it ran), `pep` (the final outcome), and `approval` when a person answers. `GET /api/trace` returns them newest first; the Trace page shows them. Events pass through a credential filter, so a token-shaped value is never stored.
+Each request gets a W3C `traceparent` (an incoming valid one is continued). Hops, in order: `auth` (token verified or refused), `policy:ai-policy` (Cedar, with latency), `tool` (only when it ran), `pep` (the final outcome), and `approval` when a person answers. `GET /api/trace` returns them newest first, plus `explanations` (the plain-English why of the `pep` and `approval` hops, keyed by `span_id`; the events themselves have no such field); the Trace page shows them. An explanation carries amounts, groups and scopes, so it is returned only to the requester, a named approver and an admin, the same people `GET /api/approvals` shows the call to. Events pass through a credential filter, so a token-shaped value is never stored.
 
 ## Web
 

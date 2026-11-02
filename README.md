@@ -106,13 +106,23 @@ BASE_URL=http://127.0.0.1:4510 npm run smoke     # checks live mode by content
 
 To point it at a real PingFederate, put its base URL in `PF_URL` (https) and the audience it issues in `PF_AUDIENCE`; tokens must be RS256 or ES256 and carry `sub`, `groups` (array) and `client_id`; `scope` and an object-valued `act` are optional. `GET /api/preflight` lists what is missing.
 
+## Understanding a decision
+
+Every tool call, held call and "Test a request" answer comes with a plain-English card, so nobody has to read Cedar.
+
+- **The card** (Tool console, Test a request, Approvals, and "Why this decision" on the Trace page): *Who asked* (the person from the token, their groups, the agent acting for them), *What was asked* (tool, app, the amount, attended or unattended), *Why* (one sentence naming the deciding rule and what it requires), *What would change the answer* (only when it can be worked out; each line is checked by running the request again with that one change), *Approval* (who must approve, and where), and *Rules checked*: every active rule marked *Allowed it*, *Blocked it*, *Held it for approval*, *Did not apply* (with the real reason) or *Not about this tool*. The raw facts are under *Technical details*.
+- **The rules**: on **AI Policies** each rule says what it does, who it covers, which tools, its conditions, whether it allows, blocks or holds, and how rules combine (a block rule always beats an allow rule; if nothing allows a call it is denied). Examples are computed by asking the real rules; they are not typed. A rule the page cannot put into words says "Explained from its text". While an admin edits, the meaning of the unsaved text is previewed.
+- **Try this**: on the Tool console, buttons fill in the form (they never call) for the cases the shipped rules are built around, with what to expect next to each. Every expectation is tested against the real outcome. The expectations are written for the mock people, so the card is shown in Mock mode only; a button written for someone else is dimmed and disabled, and says whose result it shows.
+- **API**: `explanation` on `POST /api/tools/call` (also `?envelope=1`), approvals (`explanation`, `outcome.explanation`), `GET /api/trace` (`explanations`, keyed by span id), `POST /api/decide-test` with `"explain": true`; `meaning` on `GET /api/policies` rows; `POST /api/policies/explain {id, text}`. `/mcp` errors keep exactly `decision, reason, rule, rules`; read the explanation through the Trace API using the returned `traceparent`.
+- The explanation is checked against Cedar's own answer. If the two ever disagree it drops its per-rule reasons and says "Per-rule detail could not be checked for this request"; it never changes a decision.
+
 ## Tests
 
 ```sh
 npm test      # server (vitest: Cedar behind a no-network guard, then the app), then web (vitest, jsdom)
 ```
 
-On Node 26: server 452 passed, 0 failed (26 files); web 124 passed, 0 failed (8 files). `npm run doctor` is all ok.
+On Node 26: server 527 passed, 0 failed (30 files); web 162 passed, 0 failed (14 files). `npm run doctor` is all ok.
 Browser stories: `npm run build && npm run e2e` (S04, S01, S23, S05, and a check that the browser console has no errors) and `npm run e2e:utility` (the utility pack, light and dark at desktop and 375 px) drive the real UI in Chromium (`npx playwright install chromium`); `npm run check:diagrams` runs the family's label-overlap detector on every diagram at three widths. They are not part of `npm test`.
 
 ## Troubleshooting

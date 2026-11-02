@@ -47,6 +47,10 @@ through one door. The door reads who the person is from their access token, asks
 Dana (admin) is hidden until you create the switch file: `touch .data/ALLOW_ADMIN_PERSONA` (in Docker:
 `docker compose exec privilege-demo-lab touch /data/ALLOW_ADMIN_PERSONA`).
 
+## Read the card (60 seconds)
+
+After any call, read the Decision card top to bottom instead of explaining Cedar. **Who asked**: the person, their groups, and the agent if there is one. **What was asked**: the tool and the amount. **Why**: one sentence naming the rule that decided and what it requires. **Rules checked**: every rule, with a word for each (*Allowed it*, *Blocked it*, *Held it*, *Did not apply* and the reason). Say: "A block rule always beats an allow rule, and if nothing allows a call it is denied." For a hold, read the *Approval* line: it says who approves and where. Use **Try this** to get to a good example in one click; each button says what to expect before you press Call.
+
 ## Trying the MCP door from a terminal
 
 In mock mode, the Tool console has **Get a mock token**: a token for the signed-in person, signed by the in-process mock issuer

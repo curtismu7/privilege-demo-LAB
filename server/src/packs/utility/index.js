@@ -7,7 +7,7 @@ import { UTILITY_TOOLS } from './tools.js';
 
 const here = (p) => new URL(p, import.meta.url);
 const data = JSON.parse(readFileSync(here('./pack.json'), 'utf8'));
-const { personas, argDefaults, scenarios, groups, notice, agent, diagram, approvalsHint } = data;
+const { personas, argDefaults, scenarios, tryThis, groups, notice, agent, diagram, approvalsHint } = data;
 const GENERIC_POLICIES = new URL('../../cedar/policies/', import.meta.url);
 
 export default {
@@ -30,6 +30,7 @@ export default {
     toolNames: UTILITY_TOOLS.map((t) => t.name),
     argDefaults,
     scenarios,
+    tryThis,
     diagram,
     approvalsHint,
     testUsers: Object.entries(personas).map(([id, p]) => ({ id, label: `${p.name} (${p.role})`, groups: p.claims.groups })),

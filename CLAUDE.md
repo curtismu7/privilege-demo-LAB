@@ -34,6 +34,7 @@ it says mock or live; shared-file key `PRIVILEGE_DEMO_MODE`), default mock.
 - Workspaces (rule 13): `X-Workspace` header, default `default`; per-workspace store, approvals, drift, trace, audit, sign-in cookie. The default
   workspace keeps the original `DATA_DIR` layout, others live in `DATA_DIR/workspaces/<id>`. Reset clears one workspace.
 - Loopback bind (0.0.0.0 only inside Docker, published on 127.0.0.1), Host check (`LAB_ALLOWED_HOSTS` adds names), same-origin JSON-only writes.
+- Explanations live in `server/src/explain/` (derived permit-only pieces, one extra Cedar call, checked against `decide()`; text built from templates, never per scenario). They are additive hooks in `pep.js`, `approvals.js` and `app.js`; never edit `cedar/decide.js`. Shapes that tests pin and must not grow: `/mcp` error `data`, trace events, the generic public pack `{id,label}`, `POST /api/policies/validate`, decide-test `outcome`. Golden files: `UPDATE_GOLDEN=1` in `server/test/cedar`.
 - Cedar is the decision point. `decide()` fails closed; free text (justification) never reaches it; arguments are validated before Cedar.
 - Stories use `{{cast}}` tokens (`web/src/data`); `customer.config.json` (gitignored; `customer.config.example.json`) renames people and nouns.
   A test fails on any undefined token (`scripts/story-tokens.mjs`).
