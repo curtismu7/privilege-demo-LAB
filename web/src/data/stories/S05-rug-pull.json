@@ -33,7 +33,7 @@
       "say": "Her permission is intact. The tool is the thing that changed, so the tool is refused.",
       "why": "The forbid applies to every principal and every tool whose hash drifts.",
       "blocked": {
-        "tell": "Call search_flights as {{mary}} after the drift: denied, with the rug-pull policy named and her own permit listed as overridden.",
+        "tell": "On the AI Policies page, in Test a request, choose {{mary}} and search_flights, keep the schema-changed box ticked and press Test request: denied by s05-rugpull-pin, and her own permit s04-analysts-search-ticketing is shown under Also applied as \"Would have allowed it, but a block rule beat it\".",
         "say": "A forbid beats her permit."
       }
     },
@@ -41,12 +41,12 @@
       "n": 4,
       "title": "Put it back",
       "tell": "Press Reset in the AI Policies tab (admin). The drift is cleared and the call is allowed again.",
-      "say": "A reviewed tool is trusted again only because someone re-approved it.",
+      "say": "Here Reset just puts the tool back. In a real deployment it is trusted again only after someone reviews it and re-pins it.",
       "why": "In a real deployment re-pinning is the review step."
     }
   ],
   "proof": {
     "happy": "The Tool console list: pinned and observed hashes equal, and the call allowed.",
-    "blocked": "The result card: deny by s05-rugpull-pin with the reason, and the hashes shown as different."
+    "blocked": "The Test a request card: deny by s05-rugpull-pin, \"Tool schema: changed since it was approved\", with her permit shown as beaten. (After the admin drift, the pinned and observed hashes are in the tool list beside the card.)"
   }
 }
