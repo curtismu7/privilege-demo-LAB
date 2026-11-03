@@ -55,7 +55,7 @@ export async function startStubPf() {
   return { url, mint, wrongKey: other, close: () => new Promise((r) => { server.closeAllConnections(); server.close(r); }) };
 }
 
-export const pfApp = (pf, over = {}, opts = {}) => makeApp({ idp: 'pf', pfUrl: pf.url, pfIssuer: pf.url, pfJwksUrl: `${pf.url}/pf/JWKS`, pfAudience: AUD, clockSkewSec: 30, ...over }, opts);
+export const pfApp = (pf, over = {}, opts = {}) => makeApp({ idp: 'pf', pfUrl: pf.url, pfIssuer: pf.url, pfJwksUrl: `${pf.url}/pf/JWKS`, pfAudience: AUD, clockSkewSec: 30, pfAuthClientId: 'pd-web', pfAuthClientSecret: 'pd-secret', pfAuthRedirectUri: `${pf.url}/cb`, ...over }, opts);
 
 export const bearer = (t) => ({ authorization: `Bearer ${t}` });
 export const rpc = (agent, token, method, params, id = 1) =>

@@ -2,7 +2,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { api } from "./api";
 
-export const SessionContext = createContext({ status: "anon", me: null, config: null, refresh: () => {}, signIn: async () => ({}), signOut: async () => {}, setMode: async () => ({}) });
+export const SessionContext = createContext({ status: "anon", me: null, config: null, refresh: () => {}, signIn: async () => ({}), liveSignIn: async () => ({}), signOut: async () => {}, setMode: async () => ({}) });
 export const useSession = () => useContext(SessionContext);
 
 export function SessionProvider({ children }) {
@@ -19,6 +19,12 @@ export function SessionProvider({ children }) {
     if (r.ok) await refresh();
     return r;
   }, [refresh]);
+  // Live sign-in (pi.flow): start the flow, then post the credentials. A refusal carries the server's reason.
+  const liveSignIn = useCallback(async (username, password) => {
+    const start = await api("/api/auth/live/start", { method: "POST" });
+    if (!start.ok) return start;
+    return api("/api/auth/live/credentials", { method: "POST", body: { username, password } });
+  }, []);
   const signOut = useCallback(async () => { await api("/api/auth/logout", { method: "POST" }); await refresh(); }, [refresh]);
   // The Mock/Live toggle. Returns the server's answer; a refusal (live needs PF settings) carries the fix in data.liveFix.
   const setMode = useCallback(async (mode) => {
@@ -28,6 +34,6 @@ export function SessionProvider({ children }) {
     await refresh();
     return r;
   }, [refresh, state.config]);
-  const value = useMemo(() => ({ ...state, refresh, signIn, signOut, setMode }), [state, refresh, signIn, signOut, setMode]);
+  const value = useMemo(() => ({ ...state, refresh, signIn, liveSignIn, signOut, setMode }), [state, refresh, signIn, liveSignIn, signOut, setMode]);
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

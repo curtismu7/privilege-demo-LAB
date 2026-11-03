@@ -55,7 +55,7 @@ describe('the Mock/Live toggle (PUT /api/mode)', () => {
   it('switches both ways when PF is configured, and health follows', async () => {
     const pf = await startStubPf();
     try {
-      const ctx = mockApp({ pfUrl: pf.url, pfIssuer: pf.url, pfJwksUrl: `${pf.url}/pf/JWKS`, pfAudience: 'privilege-demo-test' });
+      const ctx = mockApp({ pfUrl: pf.url, pfIssuer: pf.url, pfJwksUrl: `${pf.url}/pf/JWKS`, pfAudience: 'privilege-demo-test', pfAuthClientId: 'pd-web', pfAuthClientSecret: 'pd-secret', pfAuthRedirectUri: `${pf.url}/cb` });
       expect((await request(ctx.app).put('/api/mode').send({ mode: 'live' })).body.mode).toBe('live');
       expect((await request(ctx.app).get('/api/health')).body.runtime).toBe('live');
       // In live mode the persona session is not an identity, and the mock sign-in is refused.
@@ -113,7 +113,7 @@ describe('mock mode: an in-process mock issuer, tokens labelled mock', () => {
   it('a live (PingFederate) config does not change what mock mode trusts', async () => {
     const pf = await startStubPf();
     try {
-      const ctx = mockApp({ pfUrl: pf.url, pfIssuer: pf.url, pfJwksUrl: `${pf.url}/pf/JWKS`, pfAudience: 'privilege-demo-test' });
+      const ctx = mockApp({ pfUrl: pf.url, pfIssuer: pf.url, pfJwksUrl: `${pf.url}/pf/JWKS`, pfAudience: 'privilege-demo-test', pfAuthClientId: 'pd-web', pfAuthClientSecret: 'pd-secret', pfAuthRedirectUri: `${pf.url}/cb` });
       const r = await request(ctx.app).get('/api/me').set(bearer(await pf.mint()));
       expect(r.status).toBe(401);
       expect(['bad_signature', 'unverifiable']).toContain(r.body.reason);
