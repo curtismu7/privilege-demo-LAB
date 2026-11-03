@@ -22,7 +22,7 @@ const MOCK_REFUSALS = {
 
 /** Sign-in. Host-run offline mock: a persona picker. Server in pf mode: Bearer token guidance. */
 export default function HomePage() {
-  const { status, me, config, signIn } = useSession();
+  const { status, me, config, signIn, liveSignIn } = useSession();
   const pack = usePack();
   const castName = useCastName();
   const [personas, setPersonas] = useState(null);
@@ -78,6 +78,8 @@ export default function HomePage() {
           <h2 id="off-h">Mock sign-in is off</h2>
           <p>{MOCK_REFUSALS[config.mockRefusal] ?? "Mock sign-in is not available for this request."}</p>
         </section>
+      ) : config?.liveSignin ? (
+        <LiveSignInCard liveSignIn={liveSignIn} />
       ) : (
         <section className="card" aria-labelledby="bearer-h">
           <h2 id="bearer-h">Bearer token</h2>
@@ -87,5 +89,35 @@ export default function HomePage() {
         </section>
       )}
     </main>
+  );
+}
+
+
+// Live sign-in: a real PingFederate pi.flow login driven server-side. The username and password go to
+// PingFederate's Authentication API and are never stored; the returned token is verified against the PF JWKS
+// before the session is issued. Shown only when the server says the sign-in client is configured.
+function LiveSignInCard({ liveSignIn }) {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState("");
+  const submit = async (e) => {
+    e.preventDefault();
+    setBusy(true); setProblem("");
+    const r = await liveSignIn(username, password);
+    setBusy(false);
+    if (!r.ok) setProblem(`Sign-in refused (${r.data?.reason ?? r.data?.error ?? r.status}).`);
+  };
+  return (
+    <section className="card" aria-labelledby="live-signin-h">
+      <h2 id="live-signin-h">Sign in with PingFederate</h2>
+      <p className="muted">Live mode: the sign-in runs through PingFederate's Authentication API (pi.flow, no redirect). The token is verified against the PingFederate JWKS before the session is issued; the password is never stored.</p>
+      <form onSubmit={submit} aria-label="Live sign-in">
+        <label className="inline" htmlFor="live-user">Username<input id="live-user" type="text" autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} maxLength={256} required /></label>
+        <label className="inline" htmlFor="live-pass">Password<input id="live-pass" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} maxLength={1024} required /></label>
+        <button type="submit" className="primary" disabled={busy || !username || !password}>{busy ? "Signing in…" : "Sign in"}</button>
+      </form>
+      {problem && <p role="alert" className="problems">{problem}</p>}
+    </section>
   );
 }

@@ -181,12 +181,12 @@ describe('startup refusals', () => {
     expect(startupProblems({ ...base, idp: 'pf', mockSignin: false, pfUrl: 'http://pf.example', pfIssuer: 'http://pf.example', pfJwksUrl: 'http://pf.example/pf/JWKS', pfAudience: 'a' }).join()).toMatch(/https/);
     const stub = { ...base, idp: 'pf', mockSignin: false, pfUrl: 'http://stub-issuer:9031', pfIssuer: 'http://stub-issuer:9031', pfJwksUrl: 'http://stub-issuer:9031/pf/JWKS', pfAudience: 'a' };
     expect(startupProblems(stub).join()).toMatch(/https/);
-    expect(startupProblems({ ...stub, pfHttpHosts: ['stub-issuer'] })).toEqual([]);
+    expect(startupProblems({ ...stub, pfHttpHosts: ['stub-issuer'], pfAuthClientId: 'c', pfAuthClientSecret: 's', pfAuthRedirectUri: 'http://stub-issuer:9031/cb' })).toEqual([]);
     expect(startupProblems({ ...stub, pfHttpHosts: ['other'] }).join()).toMatch(/https/);
   });
   it('clean configs have no problems', () => {
     expect(startupProblems(base)).toEqual([]);
-    expect(startupProblems({ ...base, idp: 'pf', mockSignin: false, nodeEnv: 'production', host: '0.0.0.0', pfUrl: 'https://pf.example', pfIssuer: 'https://pf.example', pfJwksUrl: 'https://pf.example/pf/JWKS', pfAudience: 'a' })).toEqual([]);
+    expect(startupProblems({ ...base, idp: 'pf', mockSignin: false, nodeEnv: 'production', host: '0.0.0.0', pfUrl: 'https://pf.example', pfIssuer: 'https://pf.example', pfJwksUrl: 'https://pf.example/pf/JWKS', pfAudience: 'a', pfAuthClientId: 'c', pfAuthClientSecret: 's', pfAuthRedirectUri: 'https://pf.example/cb' })).toEqual([]);
   });
   const entry = fileURLToPath(new URL('../../src/index.js', import.meta.url));
   const run = (env) => spawnSync(process.execPath, [entry], { env: { PATH: process.env.PATH, ...env }, encoding: 'utf8', timeout: 15000 });
