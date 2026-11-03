@@ -12,6 +12,7 @@ import { isAdmin } from './auth/personas.js';
 import { getPack, publicPack } from './packs/index.js';
 import { createSessions } from './auth/session.js';
 import { createPfVerifier, createVerifier } from './auth/pf.js';
+import { createPiFlowLogin } from './auth/piflowLogin.js';
 import { createMockIdp } from './mockIdp.js';
 import { createNetguard } from './netguard.js';
 import { loadCustomerConfig, publicConfig } from './customer.js';
@@ -61,8 +62,11 @@ export function createApp({ cfg = config(), now = () => Date.now(), fetchImpl = 
   const mockIdp = createMockIdp({ now, personas: PERSONAS, agent: AGENT });
   const verifyMock = createVerifier({ keySource: mockIdp.publicKey, issuer: mockIdp.issuer, audience: mockIdp.audience, clockSkewSec: cfg.clockSkewSec });
   const verifyPf = cfg.pfJwksUrl ? createPfVerifier(cfg, { fetchImpl: netguard.fetchImpl }) : null;
+  const liveLogin = mode() === 'live' || cfg.pfAuthClientId ? createPiFlowLogin({ cfg, fetchImpl: netguard.fetchImpl, now }) : null;
 
   const sessions = createSessions({ secret: cfg.sessionSecret, ttlMs: cfg.sessionTtlMs, now });
+  // Live sign-in runs (pi.flow), one in flight per workspace: the flow id is a bearer handle and stays here.
+  const loginRuns = new Map();
   const preflight = createPreflight({ cfg, mode, now, fetchImpl: netguard.fetchImpl });
 
   // ---- workspaces: one policy store, approval queue, drift state, trace buffer and audit log each ----
@@ -166,7 +170,12 @@ export function createApp({ cfg = config(), now = () => Date.now(), fetchImpl = 
       emit('allow', live ? 'pf-bearer' : 'mock-bearer', live ? 'Token verified against the PingFederate JWKS' : 'Mock token verified against the in-process mock issuer (mock)', v.claims);
       return { ok: true, claims: v.claims, source: 'bearer', traceparent: tp };
     }
-    const persona = !bearerOnly && !mockRefusal(req) ? sessions.read(req.headers.cookie, ws.id) : null;
+    const who = !bearerOnly ? sessions.readAny(req.headers.cookie, ws.id) : null;
+    if (who && typeof who === 'object' && who.claims) {
+      emit('allow', 'live-session', 'Verified at sign-in against the PingFederate JWKS (live pi.flow sign-in)', who.claims);
+      return { ok: true, claims: who.claims, source: 'session', traceparent: tp };
+    }
+    const persona = typeof who === 'string' && !mockRefusal(req) ? who : null;
     const p = persona && Object.hasOwn(PERSONAS, persona) ? PERSONAS[persona] : null;
     if (p && (!p.admin || adminSwitchPresent(cfg))) {
       emit('allow', 'mock-session', `Persona ${p.name} (offline mock)`, p.claims);
@@ -191,7 +200,7 @@ export function createApp({ cfg = config(), now = () => Date.now(), fetchImpl = 
     const problems = liveProblems(cfg);
     if (problems.length === 0) return {};
     // Names what is missing. In Docker the container only sees the shared file through the compose overlay.
-    return { liveFix: `Live mode still needs: ${problems.join('; ')}. Set PF_URL and PF_AUDIENCE in ~/Development/.env (or the file STANDALONE_ENV names), then restart. In Docker also start with the overlay: docker compose -f docker-compose.yml -f docker-compose.shared-env.yml up -d. Mock mode needs nothing.` };
+    return { liveFix: `Live mode still needs: ${problems.join('; ')}. Set PF_URL, PF_AUDIENCE and the sign-in client (PF_AUTH_CLIENT_ID, PF_AUTH_CLIENT_SECRET, PF_AUTH_REDIRECT_URI) in ~/Development/.env (or the file STANDALONE_ENV names), then restart. In Docker also start with the overlay: docker compose -f docker-compose.yml -f docker-compose.shared-env.yml up -d. Mock mode needs nothing.` };
   };
   const modeView = (req) => ({
     mode: mode(), liveReady: liveReady(),
@@ -212,6 +221,7 @@ export function createApp({ cfg = config(), now = () => Date.now(), fetchImpl = 
   app.get('/api/auth/config', (req, res) => res.json({
     idp: mode() === 'live' ? 'pf' : 'local-mock', mode: mode(), liveReady: liveReady(), ...liveFix(), workspace: req.workspaceId,
     mockAvailable: !mockRefusal(req), mockRefusal: mockRefusal(req), bearer: mode() === 'live' ? Boolean(verifyPf) : true, pack: publicPack(pack),
+    liveSignin: mode() === 'live' && liveReady() && Boolean(cfg.pfAuthClientId),
     customer: publicConfig(customer),
   }));
 
@@ -240,9 +250,39 @@ export function createApp({ cfg = config(), now = () => Date.now(), fetchImpl = 
       res.json({ mock: true, label: 'mock token: signed by the in-process mock issuer, not by PingFederate', access_token: token, expires_in: 600, audience: mockIdp.audience, issuer: mockIdp.issuer });
     }));
   }
+  const meView = ({ claims, source, persona }) => ({ sub: claims.sub, groups: claims.groups ?? [], scope: claims.scope ?? '', isAdmin: isAdmin(claims), source, persona: persona ?? null, ...(pack.web && persona ? { name: PERSONAS[persona]?.name } : {}) });
+  // ---- live sign-in (pi.flow, live mode only): a real PingFederate login that signs the same persona session ----
+  const liveSigninOk = (req, res) => {
+    if (mode() !== 'live') { res.status(403).json({ error: 'mock_only_feature', reason: 'The pi.flow sign-in runs in live mode. Switch to Live, or use the persona picker in Mock.' }); return false; }
+    if (!liveReady() || !cfg.pfAuthClientId) { res.status(409).json({ error: 'live_not_configured', liveFix: liveFix().liveFix }); return false; }
+    return true;
+  };
+  app.post('/api/auth/live/start', wrap(async (req, res) => {
+    if (!liveSigninOk(req, res)) return;
+    const run = await liveLogin.start();
+    loginRuns.set(req.workspaceId, run);
+    res.json({ ok: true, status: run.status });
+  }));
+  app.post('/api/auth/live/credentials', wrap(async (req, res) => {
+    if (!liveSigninOk(req, res)) return;
+    const run = loginRuns.get(req.workspaceId);
+    try {
+      const tokens = await liveLogin.submit(run, { username: req.body?.username, password: req.body?.password });
+      // The access token is verified exactly as a Bearer token would be, so the session carries only verified claims.
+      const v = verifyPf ? await verifyPf(`Bearer ${tokens.accessToken}`) : { ok: false, reason: 'pf_not_configured' };
+      if (!v.ok) return res.status(401).json({ error: 'token_invalid', reason: v.reason });
+      const sub = String(v.claims.sub ?? '');
+      loginRuns.delete(req.workspaceId);
+      res.set('set-cookie', sessions.cookie(sessions.issueClaims(v.claims, req.workspaceId), Math.floor(cfg.sessionTtlMs / 1000), req.workspaceId));
+      return res.json({ ok: true, me: meView({ claims: v.claims, source: 'bearer' }) });
+    } catch (e) {
+      const status = e.status || 502;
+      if (status >= 500 || status === 401) loginRuns.delete(req.workspaceId);
+      return res.status(status).json({ error: e.code || 'signin_failed', reason: e.message, ...(e.detail ? { detail: e.detail } : {}) });
+    }
+  }));
   app.post('/api/auth/logout', (req, res) => { res.set('set-cookie', sessions.cookie('', 0, req.workspaceId)); res.json({ ok: true }); });
 
-  const meView = ({ claims, source, persona }) => ({ sub: claims.sub, groups: claims.groups ?? [], scope: claims.scope ?? '', isAdmin: isAdmin(claims), source, persona: persona ?? null, ...(pack.web && persona ? { name: PERSONAS[persona]?.name } : {}) });
   app.get('/api/me', authed({}, (req, res) => res.json(meView(req.principal))));
   // The same answer for the web app, but "nobody is signed in" is a normal 200 with me: null, so the browser console stays clean.
   app.get('/api/session', wrap(async (req, res) => {
