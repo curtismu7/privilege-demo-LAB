@@ -44,12 +44,13 @@ export function config() {
     pfUrl: (env.PF_URL || '').replace(/\/+$/, ''),
     pfIssuer: (env.PF_ISSUER || env.PF_URL || '').replace(/\/+$/, ''),
     pfJwksUrl: env.PF_JWKS_URL || (env.PF_URL ? `${env.PF_URL.replace(/\/+$/, '')}/pf/JWKS` : ''),
+    pfIntrospectionUrl: env.PF_INTROSPECTION_URL || (env.PF_URL ? `${env.PF_URL.replace(/\/+$/, '')}/as/introspect.oauth2` : ''),
     pfAudience: env.PF_AUDIENCE || '',
     // Live sign-in (pi.flow): the OAuth client the lab drives through PingFederate's Authentication API.
     pfAuthClientId: env.PF_AUTH_CLIENT_ID || '',
     pfAuthClientSecret: env.PF_AUTH_CLIENT_SECRET || '',
     pfAuthRedirectUri: env.PF_AUTH_REDIRECT_URI || (env.PF_URL ? `${env.PF_URL.replace(/\/+$/, '')}/cb` : ''),
-    pfAuthScope: env.PF_AUTH_SCOPE || 'openid profile',
+    pfAuthScope: env.PF_AUTH_SCOPE === '' ? '' : (env.PF_AUTH_SCOPE || 'openid profile'), // '' = ask for no scope (restricted-scope PFs)
     // Host names (comma separated) that may be reached over plain http, beside loopback. For the compose stub issuer only.
     pfHttpHosts: (env.PF_HTTP_HOSTS || '').split(',').map((h) => h.trim().toLowerCase()).filter(Boolean),
     clockSkewSec: Math.min(num(env.CLOCK_SKEW_SEC, 30), 60), // hard upper bound: 60 s

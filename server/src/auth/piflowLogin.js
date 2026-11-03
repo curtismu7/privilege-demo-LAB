@@ -87,11 +87,13 @@ export function createPiFlowLogin({ cfg, fetchImpl, now = Date.now }) {
       const nonce = crypto.randomBytes(24).toString('base64url');
       const metadata = await discover();
       const url = new URL(metadata.authorizationEndpoint);
-      url.search = new URLSearchParams({
+      const params = {
         response_type: 'code', client_id: cfg.pfAuthClientId, redirect_uri: cfg.pfAuthRedirectUri,
-        scope: cfg.pfAuthScope || 'openid profile', state, nonce,
-        code_challenge: codes.challenge, code_challenge_method: 'S256', response_mode: 'pi.flow',
-      }).toString();
+        state, nonce, code_challenge: codes.challenge, code_challenge_method: 'S256', response_mode: 'pi.flow',
+      };
+      // A PingFederate that restricts scopes ("only the default scope") refuses any scope request: omit it then.
+      if (cfg.pfAuthScope !== '') params.scope = cfg.pfAuthScope || 'openid profile';
+      url.search = new URLSearchParams(params).toString();
       const opened = await call(url.toString(), { headers: { Accept: PIFLOW_JSON } });
       const flow = opened.json;
       if (!opened.ok || !FLOW_ID.test(String(flow?.id || ''))) {
