@@ -162,3 +162,5 @@ pre, .editor { font-family: var(--font-mono); font-size: 12px; }
   .shell-tools { margin-left: 0; }
   .timeline__item { grid-template-columns: minmax(0, 1fr); }
 }
+.shell-signin { border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; color: var(--text); text-decoration: none; font-weight: 600; }
+.shell-signin:hover { border-color: var(--accent); color: var(--accent); }
