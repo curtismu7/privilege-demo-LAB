@@ -11,7 +11,9 @@ const HOSTNAME = /^(?=.{1,253}$)[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a
 export function config() {
   const env = process.env;
   // DEMO_MODE (or MODE, when it says mock or live: Vitest and other tools set MODE to unrelated words, which are ignored).
-  const modeRaw = env.DEMO_MODE || (['mock', 'live'].includes(env.MODE) ? env.MODE : 'mock');
+  // Rule 19: Real is the default when configured — PF_URL + PF_AUDIENCE present and DEMO_MODE unset means live.
+  const pfConfigured = Boolean(env.PF_URL && env.PF_AUDIENCE);
+  const modeRaw = env.DEMO_MODE || (['mock', 'live'].includes(env.MODE) ? env.MODE : pfConfigured ? 'live' : 'mock');
   const mode = modeRaw === 'live' ? 'live' : 'mock';
   const dataDir = env.DATA_DIR || '.data';
   const num = (v, d) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : d);
