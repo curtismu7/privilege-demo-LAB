@@ -30,7 +30,10 @@ export function localRequestRefusal(req, cfg) {
   if (!isLoopbackHost(cfg.host) && !published) return 'non_loopback_listener';
   if (!published && (!loopbackAddr(req.socket?.localAddress) || !loopbackAddr(req.socket?.remoteAddress))) return 'non_loopback_connection';
   if (proxyHeaderPresent(req.headers)) return 'proxy_header';
-  if (!isLoopbackHost(hostName(req.headers?.host))) return 'non_loopback_host';
+  const host = hostName(req.headers?.host);
+  // A LAB_ALLOWED_HOSTS name resolves to this machine too (the fleet's domain-name rule): it is as local as
+  // loopback, and the connection checks above already proved the peer is this machine.
+  if (!isLoopbackHost(host) && !(cfg.allowedHosts ?? []).includes(host)) return 'non_loopback_host';
   return null;
 }
 
