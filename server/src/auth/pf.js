@@ -48,5 +48,36 @@ export function createPfVerifier(cfg, { fetchImpl } = {}) {
   const keySource = cfg.pfJwksUrl
     ? jose.createRemoteJWKSet(new URL(cfg.pfJwksUrl), { cooldownDuration: 10000, timeoutDuration: 3000, ...(fetchImpl ? { [jose.customFetch]: fetchImpl } : {}) })
     : null;
-  return createVerifier({ keySource, issuer: cfg.pfIssuer, audience: cfg.pfAudience, clockSkewSec: cfg.clockSkewSec });
+  const verifyJwt = createVerifier({ keySource, issuer: cfg.pfIssuer, audience: cfg.pfAudience, clockSkewSec: cfg.clockSkewSec });
+  // PingFederate issues REFERENCE (opaque) tokens when the grant's access token manager is the reference plugin.
+  // Those cannot be verified against the JWKS; RFC 7662 introspection at the same PingFederate is the standard
+  // answer, authenticated with the sign-in client. Same contract as the JWT verifier: { ok, claims } or { ok:false, reason }.
+  const verifyReference = async (raw) => {
+    if (!cfg.pfIntrospectionUrl || !cfg.pfAuthClientId || !cfg.pfAuthClientSecret) return { ok: false, reason: 'pf_not_configured' };
+    let response;
+    try {
+      response = await fetchImpl(cfg.pfIntrospectionUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', Authorization: `Basic ${Buffer.from(`${cfg.pfAuthClientId}:${cfg.pfAuthClientSecret}`).toString('base64')}` },
+        body: new URLSearchParams({ token: raw, token_type_hint: 'access_token' }).toString(),
+        signal: AbortSignal.timeout(8000),
+      });
+    } catch { return { ok: false, reason: 'pf_unreachable' }; }
+    if (!response.ok) return { ok: false, reason: 'pf_introspection_failed' };
+    let payload;
+    try { payload = await response.json(); } catch { return { ok: false, reason: 'pf_introspection_failed' }; }
+    if (!payload || payload.active !== true) return { ok: false, reason: 'token_inactive' };
+    const picked = {};
+    for (const k of ['sub', 'groups', 'scope', 'client_id', 'act', 'username']) if (payload[k] !== undefined) picked[k] = payload[k];
+    if (!Array.isArray(picked.groups)) return { ok: false, reason: 'groups_missing' };
+    const mapped = mapClaims(picked);
+    if (!mapped.ok) return { ok: false, reason: 'claims_invalid', problems: mapped.problems };
+    return { ok: true, claims: picked };
+  };
+  return async function verify(authorization) {
+    const raw = /^Bearer ([A-Za-z0-9._~+/=-]+)$/i.exec(authorization || '')?.[1];
+    if (!raw) return { ok: false, reason: 'no_bearer' };
+    if (raw.split('.').length === 3) return verifyJwt(authorization);
+    return verifyReference(raw);
+  };
 }
