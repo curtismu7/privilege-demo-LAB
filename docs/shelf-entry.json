@@ -9,5 +9,9 @@
   "composeOverlays": [],
   "port": 4510,
   "notes": "Host-run: npm install && npm run build && npm start (port 4510, loopback only; mock mode needs no settings). Docker: docker compose up --build -d (publishes 127.0.0.1:4510 only). Catalog id D1 (PingOne Privilege, AI gateway), with Cedar as its AI Policies engine.",
-  "catalogId": "D1"
+  "catalogId": "D1",
+  "pingProducts": [
+    "pingfederate",
+    "pingone"
+  ]
 }
