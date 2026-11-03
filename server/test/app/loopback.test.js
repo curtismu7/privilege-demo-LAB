@@ -64,3 +64,21 @@ describe('the shared settings file in Docker', () => {
     expect(overlay).not.toMatch(/ports:/);
   });
 });
+
+describe('rule 19 real-default', () => {
+  const withEnv = (over) => {
+    const saved = { ...process.env };
+    Object.assign(process.env, over);
+    try { return config().mode; } finally { process.env = saved; }
+  };
+  it('mock stays the default when PF is not configured', () => {
+    process.env.PF_URL = ''; process.env.PF_AUDIENCE = ''; process.env.DEMO_MODE = ''; process.env.MODE = '';
+    expect(withEnv({ PF_URL: '', PF_AUDIENCE: '' })).toBe('mock');
+  });
+  it('live is the default when PF_URL and PF_AUDIENCE are set and DEMO_MODE does not say otherwise', () => {
+    expect(withEnv({ PF_URL: 'https://pf.example', PF_AUDIENCE: 'privilege-demo', DEMO_MODE: '', MODE: '' })).toBe('live');
+  });
+  it('DEMO_MODE=mock still wins over configured PF (the owner can pin mock)', () => {
+    expect(withEnv({ PF_URL: 'https://pf.example', PF_AUDIENCE: 'privilege-demo', DEMO_MODE: 'mock' })).toBe('mock');
+  });
+});
