@@ -43,11 +43,19 @@ export function config() {
     pfIssuer: (env.PF_ISSUER || env.PF_URL || '').replace(/\/+$/, ''),
     pfJwksUrl: env.PF_JWKS_URL || (env.PF_URL ? `${env.PF_URL.replace(/\/+$/, '')}/pf/JWKS` : ''),
     pfAudience: env.PF_AUDIENCE || '',
+    // Live sign-in (pi.flow): the OAuth client the lab drives through PingFederate's Authentication API.
+    pfAuthClientId: env.PF_AUTH_CLIENT_ID || '',
+    pfAuthClientSecret: env.PF_AUTH_CLIENT_SECRET || '',
+    pfAuthRedirectUri: env.PF_AUTH_REDIRECT_URI || (env.PF_URL ? `${env.PF_URL.replace(/\/+$/, '')}/cb` : ''),
+    pfAuthScope: env.PF_AUTH_SCOPE || 'openid profile',
     // Host names (comma separated) that may be reached over plain http, beside loopback. For the compose stub issuer only.
     pfHttpHosts: (env.PF_HTTP_HOSTS || '').split(',').map((h) => h.trim().toLowerCase()).filter(Boolean),
     clockSkewSec: Math.min(num(env.CLOCK_SKEW_SEC, 30), 60), // hard upper bound: 60 s
   };
 }
+
+import { loginProblems } from './auth/piflowLogin.js';
+export { loginProblems };
 
 export const isLoopbackHost = (h) => LOOPBACK_HOSTS.has(String(h).toLowerCase());
 
@@ -56,6 +64,7 @@ export function liveProblems(c = config()) {
   const p = [];
   if (!c.pfUrl) p.push('live mode needs PF_URL');
   if (!c.pfAudience) p.push('live mode needs PF_AUDIENCE');
+  p.push(...loginProblems(c));
   for (const u of [c.pfIssuer, c.pfJwksUrl]) {
     if (!u) continue;
     let parsed;
