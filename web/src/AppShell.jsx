@@ -28,7 +28,7 @@ function initialTheme() {
 
 export default function AppShell({ children }) {
   const [theme, setTheme] = useState(initialTheme);
-  const { me, signOut } = useSession();
+  const { me, signOut, status, config } = useSession();
   const pack = usePack();
   const customer = useCustomer();
   const castName = useCastName();
@@ -71,6 +71,7 @@ export default function AppShell({ children }) {
               {THEMES.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
             </select>
           </label>
+          {status === "anon" && <a className="shell-signin" href="/">Sign in</a>}
         </div>
         {me && (
           <p className="shell-user" data-testid="shell-user">
