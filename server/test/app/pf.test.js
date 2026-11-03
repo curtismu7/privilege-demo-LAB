@@ -61,7 +61,8 @@ describe('Bearer PF access token', () => {
   });
   it('no bearer, garbage, and a non-JWT', async () => {
     expect((await request(ctx.app).get('/api/me')).status).toBe(401);
-    expect(await reasonOf('not-a-jwt')).toBe('malformed');
+    // A non-JWT is a reference token: without introspection configured the honest answer is pf_not_configured.
+    expect(await reasonOf('not-a-jwt')).toBe('pf_not_configured');
     expect((await request(ctx.app).get('/api/me').set('authorization', 'Basic abc')).body.reason).toBe('no_bearer');
   });
   it('the admins group makes an admin', async () => {
