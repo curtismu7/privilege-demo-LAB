@@ -3,7 +3,7 @@
 A standalone demo of a Privilege-style policy enforcement point (PEP): an AI agent's MCP tool calls are checked against [Cedar](https://www.cedarpolicy.com/) policies, and each one is allowed, denied, or held for a person to approve.
 
 Tier: Demo
-Repo: https://github.com/ping-sandbox/privilege-demo-LAB
+Repo: https://github.com/curtismu7/privilege-demo-LAB
 Catalog: D1 "PingOne Privilege (AI gateway)", with Cedar as its AI Policies engine.
 
 Personas: Mark (traveler), Mary (analyst), Priya (approver, travel-agents lead), Dana (admin). Groups: `analysts`, `finance`, `travel-agents`, `admins`. Tools: `search_flights`, `create_ticket`, `pay_invoice`, `book_fare`. The people and groups are invented for the demo. Rename them with `customer.config.json` (see below).
@@ -19,7 +19,7 @@ Personas: Mark (traveler), Mary (analyst), Priya (approver, travel-agents lead),
 Prerequisites: Node 26 or newer, git. Docker only for the Docker form.
 
 ```sh
-git clone https://github.com/ping-sandbox/privilege-demo-LAB.git
+git clone https://github.com/curtismu7/privilege-demo-LAB.git
 cd privilege-demo-LAB
 npm install
 npm run build
