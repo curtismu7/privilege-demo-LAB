@@ -4,7 +4,7 @@
   "title": "Privilege demo LAB: Cedar policy on every MCP tool call",
   "version": "0.4.0",
   "source": {
-    "repo": "ping-sandbox/privilege-demo-LAB",
+    "repo": "curtismu7/privilege-demo-LAB",
     "commit": "dde0bdd",
     "generated": "2026-10-31"
   },
