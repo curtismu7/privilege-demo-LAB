@@ -17,7 +17,7 @@ describe('README standard', () => {
   it('title ends in LAB; tier, repo and catalog lines are there', () => {
     expect(readme.split('\n')[0]).toMatch(/^# .* LAB$/);
     expect(readme).toMatch(/^Tier: Demo$/m);
-    expect(readme).toMatch(/^Repo: https:\/\/github\.com\/ping-sandbox\/privilege-demo-LAB$/m);
+    expect(readme).toMatch(/^Repo: https:\/\/github\.com\/curtismu7\/privilege-demo-LAB$/m);
     expect(readme).toMatch(/^Catalog: D1\b/m);
   });
   it('has the sections in the standard order', () => {
