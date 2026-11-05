@@ -16,6 +16,7 @@ services:
     ports:
       - "127.0.0.1:${HOST_PORT:-4510}:4510"
     environment:
+      SHELF_URL: ${SHELF_URL:-}
       PORT: "4510"
       DATA_DIR: /data
       DEMO_MODE: ${DEMO_MODE:-mock}
