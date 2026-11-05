@@ -26,6 +26,7 @@ import { createPreflight } from './preflight.js';
 import { createTracer } from './trace/hops.js';
 import { createSink, parseTraceparent, newTraceparent } from './trace/index.js';
 import { createExplainer, createExplanationStore } from './explain/index.js';
+import { shelfInfo } from './shelfLink.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const WEB_DIST = process.env.WEB_DIST || path.join(ROOT, 'web/dist');
@@ -466,6 +467,7 @@ export function createApp({ cfg = config(), now = () => Date.now(), fetchImpl = 
 
   if (fs.existsSync(WEB_DIST)) {
     app.use(express.static(WEB_DIST));
+app.get('/api/shelf', (_req, res) => { res.set('Cache-Control', 'no-store'); res.json(shelfInfo()); }); // the header "Shelf" button
     app.get('*', (_req, res) => res.sendFile(path.join(WEB_DIST, 'index.html')));
   }
   // Never echo the request body or headers: a malformed body is just a 400.

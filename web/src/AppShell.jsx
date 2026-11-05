@@ -6,6 +6,7 @@ import { useSession } from "./session";
 import { usePack } from "./pack";
 import { useCastName, useCustomer } from "./customer";
 import { setPresenter, usePresenter } from "./presenter";
+import ShelfLink from "./components/ShelfLink";
 import ModeToggle from "./components/ModeToggle";
 import ModeBanner from "./components/ModeBanner";
 import WorkspaceField from "./components/WorkspaceField";
@@ -63,6 +64,7 @@ export default function AppShell({ children }) {
           </nav>
         )}
         <div className="shell-tools">
+          <ShelfLink />
           <ModeToggle />
           <WorkspaceField />
           <button type="button" aria-pressed={presenter} onClick={() => setPresenter(!presenter)}>Presenter</button>
