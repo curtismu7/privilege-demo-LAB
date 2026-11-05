@@ -54,7 +54,7 @@ describe('shelf entry and content pack', () => {
     expect(pack.schema).toBe('demo-content-pack/1');
     expect(pack.demo).toMatchObject({ id: DEMO.id, name: DEMO.name, catalog: shelf.catalogId, doctor: '/api/health' });
     expect(pack.version).toBe(DEMO.version);
-    expect(pack.source.repo).toBe('ping-sandbox/privilege-demo-LAB');
+    expect(pack.source.repo).toBe('curtismu7/privilege-demo-LAB');
     for (const s of pack.stories) {
       const file = json(s.file);
       expect(file.id).toBe(s.id);
