@@ -22,6 +22,18 @@ export const hostAllowed = (hostHeader, cfg) => {
   return isLoopbackHost(name) || (cfg.allowedHosts ?? []).includes(name);
 };
 
+// Behind the lab-proxy the browser's Origin is the proxy's (https://local.ping-devops.com:8443) while Host is this app's own name.
+// The proxy sets X-Forwarded-Host/-Proto. They are believed only when the Host is one of the LAB_ALLOWED_HOSTS names (loopback does
+// not count), so a request that did not come through the proxy cannot use them. This is the same-origin write check only: the
+// sign-in and admin-control guards below still treat any forwarded header as proxy traffic and refuse it.
+export function forwardedOriginOk(req, cfg) {
+  const { origin } = req.headers;
+  if (!origin || !(cfg.allowedHosts ?? []).includes(hostName(req.headers.host))) return false;
+  const xfh = String(req.headers['x-forwarded-host'] || '').trim().toLowerCase();
+  const xfp = String(req.headers['x-forwarded-proto'] || 'https').trim().toLowerCase();
+  return xfh !== '' && (xfp === 'https' || xfp === 'http') && origin === `${xfp}://${xfh}`;
+}
+
 // Returns null when the request comes from this machine in the way a loopback-only demo expects, else a refusal code.
 // Used by mock sign-in and by the controls that change the demo's state without a sign-in (mode toggle, workspace reset).
 // In Docker (LAB_PUBLISH=loopback) the peer is the bridge gateway, not 127.0.0.1: the published port is loopback-only instead.

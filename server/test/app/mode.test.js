@@ -82,6 +82,42 @@ describe('the Mock/Live toggle (PUT /api/mode)', () => {
   });
 });
 
+describe('behind the lab-proxy: a write is accepted only with the proxy\'s forwarded origin AND a LAB_ALLOWED_HOSTS Host', () => {
+  const PROXY_HOST = 'privilege-demo.local.ping-devops.com:4510';
+  const ORIGIN = 'https://local.ping-devops.com:8443';
+  const fwd = { 'x-forwarded-host': 'local.ping-devops.com:8443', 'x-forwarded-proto': 'https' };
+  const ctx = () => mockApp({ allowedHosts: ['privilege-demo.local.ping-devops.com'] });
+  // POST /api/auth/logout has no proxy-header guard of its own, so it shows the same-origin write check alone.
+  const via = (c, headers, host = PROXY_HOST) => request(c.app).post('/api/auth/logout').set({ host, ...headers }).send({});
+  it('accepts what the browser and the proxy really send for a same-origin POST', async () => {
+    const c = ctx();
+    expect((await via(c, { ...fwd, origin: ORIGIN, 'sec-fetch-site': 'same-origin' })).status).toBe(200);
+    expect((await via(c, { ...fwd, origin: ORIGIN })).status).toBe(200);
+    expect((await via(c, { 'x-forwarded-host': 'local.ping-devops.com:8443', origin: ORIGIN })).status).toBe(200); // proto defaults to https
+  });
+  it('refuses a foreign origin, a forwarded-host mismatch, a wrong scheme, a cross-site fetch and a missing forwarded host', async () => {
+    const c = ctx();
+    for (const headers of [
+      { ...fwd, origin: 'https://evil.example' },
+      { ...fwd, origin: 'https://local.ping-devops.com:9999' },
+      { ...fwd, origin: 'http://local.ping-devops.com:8443' },
+      { ...fwd, origin: ORIGIN, 'sec-fetch-site': 'cross-site' },
+      { origin: ORIGIN },
+      { 'x-forwarded-host': 'evil.example', 'x-forwarded-proto': 'https', origin: ORIGIN },
+      { ...fwd, 'x-forwarded-proto': 'ftp', origin: 'ftp://local.ping-devops.com:8443' },
+    ]) {
+      const r = await via(c, headers);
+      expect([r.status, r.body.error], JSON.stringify(headers)).toEqual([403, 'cross_origin_write_refused']);
+    }
+  });
+  it('does not believe the forwarded headers on a loopback or unlisted Host, or when LAB_ALLOWED_HOSTS is empty', async () => {
+    const c = ctx();
+    for (const host of ['127.0.0.1:4510', 'localhost:4510']) expect((await via(c, { ...fwd, origin: ORIGIN }, host)).status, host).toBe(403);
+    expect((await via(c, { ...fwd, origin: ORIGIN }, 'other.example:4510')).status).toBe(403); // refused by the Host check
+    expect((await via(mockApp(), { ...fwd, origin: ORIGIN })).status).toBe(403);
+  });
+});
+
 describe('mock mode: an in-process mock issuer, tokens labelled mock', () => {
   it('a signed-in persona gets a mock token (raw, labelled) that the /mcp door accepts offline', async () => {
     const ctx = mockApp();

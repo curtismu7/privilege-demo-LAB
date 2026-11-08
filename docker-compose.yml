@@ -24,7 +24,7 @@ services:
       ALLOW_MOCK_SIGNIN: "1"
       LAB_PUBLISH: loopback
       # Extra host names the app answers to besides 127.0.0.1 and localhost; every other Host is refused.
-      LAB_ALLOWED_HOSTS: ${LAB_ALLOWED_HOSTS:-}
+      LAB_ALLOWED_HOSTS: ${LAB_ALLOWED_HOSTS:-privilege-demo.local.ping-devops.com}
       PACK: ${PACK:-generic}
       # Passed through from your shell only when set. An empty value here would beat the shared settings file (real variables win).
       PF_URL:
