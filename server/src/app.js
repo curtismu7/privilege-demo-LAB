@@ -463,11 +463,13 @@ export function createApp({ cfg = config(), now = () => Date.now(), fetchImpl = 
     res.json({ events, explanations });
   }));
 
+  // The header "Shelf" button. Before the /api 404 below, and not tied to a web build.
+  app.get('/api/shelf', (_req, res) => { res.set('Cache-Control', 'no-store'); res.json(shelfInfo()); }); // the header "Shelf" button
+
   app.use('/api', (_req, res) => res.status(404).json({ error: 'not_found' }));
 
   if (fs.existsSync(WEB_DIST)) {
     app.use(express.static(WEB_DIST));
-app.get('/api/shelf', (_req, res) => { res.set('Cache-Control', 'no-store'); res.json(shelfInfo()); }); // the header "Shelf" button
     app.get('*', (_req, res) => res.sendFile(path.join(WEB_DIST, 'index.html')));
   }
   // Never echo the request body or headers: a malformed body is just a 400.
