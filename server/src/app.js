@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { config, liveProblems } from './config.js';
 import { init } from './cedar/index.js';
-import { mockRequestRefusal, localRequestRefusal, hostAllowed, adminSwitchPresent } from './auth/guards.js';
+import { mockRequestRefusal, localRequestRefusal, hostAllowed, forwardedOriginOk, adminSwitchPresent } from './auth/guards.js';
 import { isAdmin } from './auth/personas.js';
 import { getPack, publicPack } from './packs/index.js';
 import { createSessions } from './auth/session.js';
@@ -135,7 +135,8 @@ export function createApp({ cfg = config(), now = () => Date.now(), fetchImpl = 
     return next();
   });
 
-  // A write must come from this app's own pages: a browser sends Origin on a cross-site write, and it must match the Host it reached.
+  // A write must come from this app's own pages: a browser sends Origin on a cross-site write, and it must match the Host it reached
+  // (or, behind the lab-proxy on a LAB_ALLOWED_HOSTS name, the forwarded origin).
   // Agents and curl send no Origin and are not browsers, so they pass. A body must be JSON (a cross-site form cannot send that unprompted).
   app.use((req, res, next) => {
     if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') return next();
@@ -143,7 +144,7 @@ export function createApp({ cfg = config(), now = () => Date.now(), fetchImpl = 
     const site = req.headers['sec-fetch-site'];
     let originHost = null;
     if (origin) { try { originHost = new URL(origin).host; } catch { originHost = '?'; } }
-    if ((originHost && originHost !== req.headers.host) || (site && site !== 'same-origin' && site !== 'none')) return res.status(403).json({ error: 'cross_origin_write_refused' });
+    if ((originHost && originHost !== req.headers.host && !forwardedOriginOk(req, cfg)) || (site && site !== 'same-origin' && site !== 'none')) return res.status(403).json({ error: 'cross_origin_write_refused' });
     const hasBody = req.headers['content-length'] && req.headers['content-length'] !== '0';
     if (hasBody && !String(req.headers['content-type'] || '').startsWith('application/json')) return res.status(415).json({ error: 'json_required' });
     return next();
