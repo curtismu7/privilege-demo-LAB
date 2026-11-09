@@ -8,11 +8,11 @@ The persona picker exists only when all of these hold; every request re-checks t
 
 - `ALLOW_MOCK_SIGNIN=1` (the literal `1`) and the app is in Mock mode. In Live mode the picker is refused.
 - The listener is loopback (`HOST=127.0.0.1`), or the port is published on loopback only: the Docker image listens on `0.0.0.0` inside the container, and `docker-compose.yml` sets `LAB_PUBLISH=loopback` because it publishes on `127.0.0.1` only (pinned by `server/test/app/loopback.test.js`). Outside Docker the socket peer must also be loopback.
-- The `Host` header is loopback, and no proxy header is present (`Forwarded`, `X-Forwarded-*`, `Via`, `True-Client-IP`, `CF-*`).
+- The `Host` header is loopback, and no proxy header is present (`Forwarded`, `X-Forwarded-*`, `Via`, `True-Client-IP`, `CF-*`). One exception (owner, 2026-11-08): behind the lab-proxy the `Host` is a `LAB_ALLOWED_HOSTS` name (loopback does not count) and the proxy headers are tolerated; a loopback or unlisted `Host` with a proxy header is still refused.
 - `NODE_ENV=production` is **not** a guard: the Docker images set it.
 - Dana (admin) also needs the file `DATA_DIR/ALLOW_ADMIN_PERSONA`; without it she is not offered and her login is a 404.
 
-`npm start` sets `ALLOW_MOCK_SIGNIN=1` because it is the loopback-only host-run launch; a direct `node server/src/index.js` does not. The mode toggle (`PUT /api/mode`) and the script reset route (`POST /api/workspaces/<id>/reset`) need the same local-request conditions (loopback, no proxy header, loopback Host); the reset also accepts an admin.
+`npm start` sets `ALLOW_MOCK_SIGNIN=1` because it is the loopback-only host-run launch; a direct `node server/src/index.js` does not. The mode toggle (`PUT /api/mode`) and the script reset route (`POST /api/workspaces/<id>/reset`) need the same local-request conditions (loopback, no proxy header, loopback Host; or a `LAB_ALLOWED_HOSTS` Host behind the lab-proxy); the reset also accepts an admin.
 
 ## Network: nothing leaves the machine in mock mode
 
