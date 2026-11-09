@@ -121,6 +121,8 @@ try {
     await shot(priya.page, 'S01-2-priya-sees-request');
 
     await mark.page.goto(`${BASE}/approvals`);
+    // The list loads after the page mounts: wait for Mark's request to render before checking what he can do with it.
+    await mark.page.getByRole('listitem').filter({ hasText: 'Customer rebooked after a cancellation' }).first().waitFor({ timeout: 10_000 });
     eq(await mark.page.getByRole('button', { name: 'Approve book_fare' }).count(), 0, 'Mark has an Approve button for his own request');
     has(await mark.page.locator('body').innerText(), 'someone else has to answer it', 'requester told to wait');
     await shot(mark.page, 'S01-3-mark-cannot-self-approve');
