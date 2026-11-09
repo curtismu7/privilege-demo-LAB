@@ -121,6 +121,8 @@ try {
     await shot(priya.page, 'S01-2-priya-sees-request');
 
     await mark.page.goto(`${BASE}/approvals`);
+    // The list loads after the page mounts: wait for Mark's request to render before checking what he can do with it.
+    await mark.page.getByRole('listitem').filter({ hasText: 'Customer rebooked after a cancellation' }).first().waitFor({ timeout: 10_000 });
     eq(await mark.page.getByRole('button', { name: 'Approve book_fare' }).count(), 0, 'Mark has an Approve button for his own request');
     has(await mark.page.locator('body').innerText(), 'someone else has to answer it', 'requester told to wait');
     await shot(mark.page, 'S01-3-mark-cannot-self-approve');
@@ -184,6 +186,7 @@ try {
     for (const s of TRY) {
       const { page } = users[s.as];
       await page.goto(`${BASE}/console`);
+      await page.getByRole('button', { name: filled(s.label), exact: true }).waitFor(); // the Try-this list loads after the page mounts
       has((await page.locator('#main').innerText()).toLowerCase(), `expect: ${WORD[s.expect.outcome].toLowerCase()}`, `${s.id} states what to expect`); // the chip is upper-cased by CSS
       await page.getByRole('button', { name: filled(s.label), exact: true }).click();
       eq(await page.getByRole('region', { name: 'PEP decision' }).count(), 0, `${s.id}: nothing was called yet`);
