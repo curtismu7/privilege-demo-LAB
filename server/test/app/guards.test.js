@@ -60,6 +60,54 @@ describe('mock sign-in refusals', () => {
       expect(r.status).toBe(403);
       expect(r.body.reason).toBe('proxy_header');
     });
+  describe('behind the lab-proxy: forwarded headers are tolerated ONLY on a LAB_ALLOWED_HOSTS Host (owner, 2026-11-08)', () => {
+    const PROXY_HOST = 'privilege-demo.local.ping-devops.com:4510';
+    const fwd = { 'x-forwarded-host': 'local.ping-devops.com:8443', 'x-forwarded-proto': 'https', 'x-forwarded-for': '203.0.113.9' };
+    const ORIGIN = { origin: 'https://local.ping-devops.com:8443' };
+    const proxied = () => mockApp({ allowedHosts: ['privilege-demo.local.ping-devops.com'] });
+    const sock = { localAddress: '127.0.0.1', remoteAddress: '127.0.0.1' };
+    const cfg = { mockSignin: true, host: '127.0.0.1', allowedHosts: ['privilege-demo.local.ping-devops.com'] };
+    it('mock sign-in, the mode toggle and the script reset work on the listed Host with the proxy headers', async () => {
+      const c = proxied();
+      const headers = { host: PROXY_HOST, ...fwd, ...ORIGIN };
+      expect((await login(c.app, 'mark', headers)).status).toBe(200);
+      expect((await request(c.app).put('/api/mode').set(headers).send({ mode: 'mock' })).status).toBe(200);
+      expect((await request(c.app).post('/api/workspaces/alpha/reset').set(headers).send({})).status).toBe(200);
+      expect((await request(c.app).get('/api/auth/config').set(headers)).body.mockAvailable).toBe(true);
+    });
+    it('a session made behind the proxy keeps working behind the proxy', async () => {
+      const c = proxied();
+      const headers = { host: PROXY_HOST, ...fwd, ...ORIGIN };
+      const agent = request.agent(c.app);
+      expect((await agent.post('/api/auth/mock/login').set(headers).send({ persona: 'mark' })).status).toBe(200);
+      expect((await agent.get('/api/me').set(headers)).status).toBe(200);
+    });
+    it('a loopback Host with forwarded headers is still refused, even when LAB_ALLOWED_HOSTS is set', async () => {
+      const c = proxied();
+      for (const host of ['127.0.0.1:4510', 'localhost:4510']) {
+        const r = await login(c.app, 'mark', { host, ...fwd }); // no Origin, so the same-origin write check passes and the guard itself answers
+        expect([host, r.status, r.body.reason]).toEqual([host, 403, 'proxy_header']);
+        const m = await request(c.app).put('/api/mode').set({ host, ...fwd }).send({ mode: 'mock' });
+        expect([host, m.status, m.body.reason]).toEqual([host, 403, 'proxy_header']);
+        expect((await request(c.app).post('/api/workspaces/alpha/reset').set({ host, ...fwd }).send({})).status).toBe(403);
+      }
+      expect(mockRequestRefusal({ headers: { host: 'localhost:4510', ...fwd }, socket: sock }, cfg)).toBe('proxy_header');
+    });
+    it('a Host that is not listed, with forwarded headers, is refused (unit, and over HTTP by the Host check)', async () => {
+      const req = (host) => ({ headers: { host, ...fwd }, socket: sock });
+      expect(mockRequestRefusal(req('other.example:4510'), cfg)).toBe('proxy_header');
+      expect(mockRequestRefusal(req('other.example:4510'), { ...cfg, allowedHosts: [] })).toBe('proxy_header');
+      expect(mockRequestRefusal(req(PROXY_HOST), { ...cfg, allowedHosts: [] })).toBe('proxy_header'); // LAB_ALLOWED_HOSTS unset
+      expect(mockRequestRefusal(req(PROXY_HOST), cfg)).toBeNull();
+      expect((await login(proxied().app, 'mark', { host: 'other.example:4510', ...fwd, ...ORIGIN })).status).toBe(403);
+    });
+    it('the other refusals still apply on the listed Host with forwarded headers', () => {
+      const req = (socket = sock) => ({ headers: { host: PROXY_HOST, ...fwd }, socket });
+      expect(mockRequestRefusal(req({ localAddress: '10.0.0.5', remoteAddress: '10.0.0.9' }), cfg)).toBe('non_loopback_connection');
+      expect(mockRequestRefusal(req(), { ...cfg, mockSignin: false })).toBe('disabled');
+      expect(mockRequestRefusal(req(), cfg, 'live')).toBe('live_mode');
+    });
+  });
   it('refuses a non-loopback Host header (DNS rebinding): the Host check answers first, and the guard says so too', async () => {
     const r = await login(mockApp().app, 'mark', { host: 'demo.example' });
     expect(r.status).toBe(403);

@@ -69,7 +69,7 @@ The **Mock / Live** toggle is in the header on every page, presenter mode includ
 
 - Switching to Live needs `PF_URL` and `PF_AUDIENCE`; without them the toggle says so and stays on Mock. In Live mode there is no persona picker: callers send `Authorization: Bearer <access token>` to `POST /mcp` or the `/api` routes.
 - In Mock mode the Tool console has **Get a mock token**: a token for the signed-in person (optionally with `act` set to the agent), signed by the mock issuer, to try `POST /mcp` from a terminal. `/mcp` accepts only mock tokens in Mock mode and only PingFederate tokens in Live mode.
-- Mock sign-in (rule 11) needs `ALLOW_MOCK_SIGNIN=1`, a loopback bind (or `LAB_PUBLISH=loopback`, which the Docker form sets because its port is published on 127.0.0.1 only), no proxy headers, and a loopback Host. `NODE_ENV=production` is not a guard: the Docker image sets it.
+- Mock sign-in (rule 11) needs `ALLOW_MOCK_SIGNIN=1`, a loopback bind (or `LAB_PUBLISH=loopback`, which the Docker form sets because its port is published on 127.0.0.1 only), no proxy headers (except behind the lab-proxy, where the Host is a `LAB_ALLOWED_HOSTS` name), and a loopback or `LAB_ALLOWED_HOSTS` Host. `NODE_ENV=production` is not a guard: the Docker image sets it.
 - `GET /api/health` reports `runtime: offline` in Mock mode and `live` in Live mode.
 
 Workspaces (rule 13): the header names the current workspace (default `default`). Each workspace has its own policies, approvals, drift state, trace, audit log and sign-in; the API takes it as the `X-Workspace` header. Reset clears only the current workspace.

@@ -25,7 +25,8 @@ export const hostAllowed = (hostHeader, cfg) => {
 // Behind the lab-proxy the browser's Origin is the proxy's (https://local.ping-devops.com:8443) while Host is this app's own name.
 // The proxy sets X-Forwarded-Host/-Proto. They are believed only when the Host is one of the LAB_ALLOWED_HOSTS names (loopback does
 // not count), so a request that did not come through the proxy cannot use them. This is the same-origin write check only: the
-// sign-in and admin-control guards below still treat any forwarded header as proxy traffic and refuse it.
+// sign-in and admin-control guards below use the same narrow rule (owner, 2026-11-08): forwarded headers are tolerated ONLY when the
+// Host is a LAB_ALLOWED_HOSTS name; on a loopback or unlisted Host they still mean proxy traffic and are refused.
 export function forwardedOriginOk(req, cfg) {
   const { origin } = req.headers;
   if (!origin || !(cfg.allowedHosts ?? []).includes(hostName(req.headers.host))) return false;
@@ -41,8 +42,10 @@ export function localRequestRefusal(req, cfg) {
   const published = cfg.publish === 'loopback';
   if (!isLoopbackHost(cfg.host) && !published) return 'non_loopback_listener';
   if (!published && (!loopbackAddr(req.socket?.localAddress) || !loopbackAddr(req.socket?.remoteAddress))) return 'non_loopback_connection';
-  if (proxyHeaderPresent(req.headers)) return 'proxy_header';
   const host = hostName(req.headers?.host);
+  // The lab-proxy sends X-Forwarded-* with a Host that is one of the LAB_ALLOWED_HOSTS names (loopback does not count). Any
+  // other request carrying a forwarded header is proxy traffic this demo did not set up: refused, as before.
+  if (proxyHeaderPresent(req.headers) && !(cfg.allowedHosts ?? []).includes(host)) return 'proxy_header';
   // A LAB_ALLOWED_HOSTS name resolves to this machine too (the fleet's domain-name rule): it is as local as
   // loopback, and the connection checks above already proved the peer is this machine.
   if (!isLoopbackHost(host) && !(cfg.allowedHosts ?? []).includes(host)) return 'non_loopback_host';
