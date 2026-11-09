@@ -186,6 +186,7 @@ try {
     for (const s of TRY) {
       const { page } = users[s.as];
       await page.goto(`${BASE}/console`);
+      await page.getByRole('button', { name: filled(s.label), exact: true }).waitFor(); // the Try-this list loads after the page mounts
       has((await page.locator('#main').innerText()).toLowerCase(), `expect: ${WORD[s.expect.outcome].toLowerCase()}`, `${s.id} states what to expect`); // the chip is upper-cased by CSS
       await page.getByRole('button', { name: filled(s.label), exact: true }).click();
       eq(await page.getByRole('region', { name: 'PEP decision' }).count(), 0, `${s.id}: nothing was called yet`);
