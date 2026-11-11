@@ -30,7 +30,7 @@ function Approvals() {
       <h1>Approvals</h1>
       <p className="lede">Calls the policies held for a person. Approving re-checks the call against the current policies and runs it once.</p>
       <PageStories page="approvals" />
-      <div className="row"><button type="button" onClick={load}>Refresh</button><span className="muted">Updates every few seconds.</span></div>
+      <div className="row"><button type="button" className="primary" onClick={load}>Refresh</button><span className="muted">Updates every few seconds.</span></div>
       <p role="status" className="muted">{message}</p>
       {items === null ? <p role="status">Loading…</p> : items.length === 0 ? (
         <p className="card">Nothing waiting. Make a held call in the <a href="/console">Tool console</a>: {pack.approvalsHint ?? "book_fare, amount 2400, with Dot making the call."}</p>
@@ -59,7 +59,7 @@ function Approvals() {
                 <>
                 <p className="muted">If you approve, the rules are checked again with one approval recorded and the tool runs once.</p>
                 <div className="row">
-                  <button type="button" className="primary" onClick={() => decide(a, "approve")}>Approve {a.tool}</button>
+                  <button type="button" onClick={() => decide(a, "approve")}>Approve {a.tool}</button>
                   <button type="button" onClick={() => decide(a, "deny")}>Deny {a.tool}</button>
                 </div>
                 </>

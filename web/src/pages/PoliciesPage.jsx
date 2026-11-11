@@ -147,7 +147,7 @@ function Policies() {
               <div className="row">
                 <button type="button" onClick={startNew}>New policy</button>
                 {confirmReset
-                  ? <><button type="button" className="primary" onClick={reset}>Confirm reset</button><button type="button" onClick={() => setConfirmReset(false)}>Cancel</button></>
+                  ? <><button type="button" className="danger" onClick={reset}>Confirm reset</button><button type="button" onClick={() => setConfirmReset(false)}>Cancel</button></>
                   : <button type="button" onClick={() => setConfirmReset(true)}>Reset demo</button>}
               </div>
             )}
@@ -171,7 +171,7 @@ function Policies() {
                 {admin && (
                   <div className="row">
                     <button type="button" onClick={validate} disabled={!id}>Validate</button>
-                    <button type="button" className="primary" onClick={() => save("active")} disabled={!id}>Save as Active</button>
+                    <button type="button" onClick={() => save("active")} disabled={!id}>Save as Active</button>
                     <button type="button" onClick={() => save("candidate")} disabled={!id}>Save as Candidate</button>
                     {current && <button type="button" onClick={remove}>Delete {current.state}</button>}
                   </div>

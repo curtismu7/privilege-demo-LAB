@@ -56,6 +56,8 @@ pre, .editor { font-family: var(--font-mono); font-size: 12px; }
 .editor { width: 100%; min-height: 12rem; resize: vertical; line-height: 1.5; }
 .editor[readonly] { background: var(--surface-2); }
 .link-list a { margin-right: 10px; }
+/* A destructive confirm is danger text on a plain button, never a filled red one (UI patterns section 9). */
+button.danger { color: var(--danger-text); }
 
 /* ---- outcome chips and result cards: the word carries the meaning, the colour only backs it up ---- */
 .badge { display: inline-block; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; vertical-align: middle; }

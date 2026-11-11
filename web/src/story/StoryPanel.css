@@ -14,7 +14,8 @@
 .story__summary dd { margin: 0; }
 .story__steps { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 4px; }
 .story__step { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; }
-.story__step[aria-current="step"] { border-color: var(--accent); }
+/* The current step is the shared selected state (aria-pressed: accent fill), so its number badge inverts to stay visible on it. */
+.story__step[aria-pressed="true"] .story__n { background: var(--on-accent); color: var(--accent-deep); }
 .story__n { display: inline-grid; place-items: center; min-width: 22px; height: 22px; border-radius: 999px; background: var(--accent-gradient); color: var(--on-accent); font-size: 12px; }
 .story__tag { margin-left: auto; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--status-warn); color: var(--status-warn); font-size: 12px; font-weight: 700; }
 .story__body { margin: 6px 0 6px 32px; font-size: 13px; }

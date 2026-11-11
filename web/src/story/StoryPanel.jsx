@@ -57,23 +57,25 @@ export default function StoryPanel({ id, defaultOpen = true }) {
             <dt>Obstacle</dt><dd>{story.obstacle}</dd>
             <dt>Control</dt><dd>{story.control}</dd>
           </dl>
-          <ol className="story__steps">
-            {story.steps.map((s) => (
-              <li key={s.n}>
-                <button type="button" className="story__step" aria-current={s.n === current.n ? "step" : undefined} onClick={() => setActive(s.n)}>
-                  <span className="story__n">{s.n}</span>{s.title}
-                  {blocked && s.blocked && <span className="story__tag">blocked</span>}
-                </button>
-                {s.n === current.n && (
-                  <div className="story__body">
-                    <p>{text(s).tell}</p>
-                    <p className="story__say"><strong>Say:</strong> “{text(s).say}”</p>
-                    <p className="story__why"><strong>Why it matters:</strong> {s.why}</p>
-                  </div>
-                )}
-              </li>
-            ))}
-          </ol>
+          <div role="group" aria-label="Talk track steps">
+            <ol className="story__steps">
+              {story.steps.map((s) => (
+                <li key={s.n}>
+                  <button type="button" className="story__step" aria-pressed={s.n === current.n} onClick={() => setActive(s.n)}>
+                    <span className="story__n">{s.n}</span>{s.title}
+                    {blocked && s.blocked && <span className="story__tag">blocked</span>}
+                  </button>
+                  {s.n === current.n && (
+                    <div className="story__body">
+                      <p>{text(s).tell}</p>
+                      <p className="story__say"><strong>Say:</strong> “{text(s).say}”</p>
+                      <p className="story__why"><strong>Why it matters:</strong> {s.why}</p>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ol>
+          </div>
           <p className="story__proof"><strong>Proof:</strong> {blocked ? story.proof.blocked : story.proof.happy}</p>
           <p className="story__takeaway">“{story.say}”</p>
         </div>
