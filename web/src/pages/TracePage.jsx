@@ -25,7 +25,7 @@ function Trace() {
       <p className="lede">One row per hop, newest first: who, which product, the decision and the rule that made it, and how long it took. Tokens never appear here. The "Final decision" row is the one that matters.</p>
       <PageStories page="trace" />
       <div className="row">
-        <button type="button" onClick={load}>Refresh</button>
+        <button type="button" className="primary" onClick={load}>Refresh</button>
         <label className="check">Request
           <select value={only} onChange={(e) => setOnly(e.target.value)}>
             <option value="">All requests</option>
