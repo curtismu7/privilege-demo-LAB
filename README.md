@@ -145,7 +145,7 @@ Browser stories: `npm run build && npm run e2e` (S04, S01, S23, S05, and a check
 - `web/`: React + Vite; the page is picked by path in `src/main.jsx` (no router). Diagrams are diagram-studio/1 data in `src/diagrams/`.
 - `stub-issuer/`: the local demonstration issuer and its `mint.mjs` CLI (live-mode testing only).
 - `scripts/`: `doctor.mjs`, `reset.mjs`, `start.mjs`, `smoke.mjs`, `e2e.mjs`, `pingfederate-setup.sh`, `check-ui-standard.sh`.
-- Docs: [talk track](docs/talk-track.md), [architecture and claim mapping](docs/architecture.md), [group-to-tool mapping](docs/group-to-tool-mapping.md), [how to add a policy](docs/add-a-policy.md), [security notes](docs/security.md), [utility pack](docs/utility-pack.md), [CHANGELOG](CHANGELOG.md). `content-pack.json` is the Learning Hub pack; `docs/shelf-entry.json` is the shelf entry.
+- Docs: [talk track](docs/talk-track.md), [architecture and claim mapping](docs/architecture.md), [group-to-tool mapping](docs/group-to-tool-mapping.md), [how to add a policy](docs/add-a-policy.md), [security notes](docs/security.md), [gateway front-door OIDC (pingone.env)](docs/pingone-env-config.md), [utility pack](docs/utility-pack.md), [CHANGELOG](CHANGELOG.md). `content-pack.json` is the Learning Hub pack; `docs/shelf-entry.json` is the shelf entry.
 
 ## Ownership
 
