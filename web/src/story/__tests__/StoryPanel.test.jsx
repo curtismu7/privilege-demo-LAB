@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import StoryPanel, { PageStories } from "../StoryPanel";
 import { reloadStoryPrefs } from "../useStoryPrefs";
@@ -59,5 +59,25 @@ describe("StoryPanel", () => {
     render(<PageStories page="policies" defaultOpen />);
     fireEvent.change(screen.getAllByLabelText("Vertical")[0], { target: { value: "airlines" } });
     expect(screen.getAllByLabelText("Vertical").map((s) => s.value)).toEqual(["airlines", "airlines"]);
+  });
+
+  // The steps are a selector, not actions: the current one carries the shared selected state (aria-pressed, UI patterns section 9),
+  // not aria-current. A native <button> is activated by Enter and Space in a browser (jsdom does not synthesize that click).
+  it("the steps are a named group of native buttons; aria-pressed marks the current step and moves on click", () => {
+    render(<StoryPanel id="S05" />);
+    const group = screen.getByRole("group", { name: "Talk track steps" });
+    expect(within(group).getByRole("list")).toBeInTheDocument();
+    const steps = within(group).getAllByRole("button");
+    expect(steps.length).toBeGreaterThan(2);
+    steps.forEach((b) => { expect(b.tagName).toBe("BUTTON"); expect(b).not.toHaveAttribute("aria-current"); });
+    expect(steps.map((b) => b.getAttribute("aria-pressed"))).toEqual(steps.map((_, i) => (i === 0 ? "true" : "false")));
+    fireEvent.click(steps[2]);
+    expect(steps.map((b) => b.getAttribute("aria-pressed"))).toEqual(steps.map((_, i) => (i === 2 ? "true" : "false")));
+    expect(steps.some((b) => b.classList.contains("primary"))).toBe(false);
+  });
+
+  it("the Allowed and Blocked switch is a separate named group", () => {
+    render(<StoryPanel id="S05" />);
+    expect(within(screen.getByRole("group", { name: "Story path" })).getAllByRole("button").map((b) => b.textContent)).toEqual(["Allowed", "Blocked"]);
   });
 });
