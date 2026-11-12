@@ -7,9 +7,8 @@ import { usePack } from "./pack";
 import { useCastName, useCustomer } from "./customer";
 import { setPresenter, usePresenter } from "./presenter";
 import ShelfLink from "./components/ShelfLink";
-import ModeToggle from "./components/ModeToggle";
+import TopMenu, { applyFontSize } from "./top-menu/TopMenu.jsx";
 import ModeBanner from "./components/ModeBanner";
-import WorkspaceField from "./components/WorkspaceField";
 
 const THEME_KEY = "privdemo.theme";
 const THEMES = [["auto", "Auto"], ["light", "Light"], ["dark", "Dark"]];
@@ -29,6 +28,8 @@ function initialTheme() {
 
 export default function AppShell({ children }) {
   const [theme, setTheme] = useState(initialTheme);
+  const [fontStep, setFontStep] = useState(() => { try { return localStorage.getItem("pdemo.font") || "M"; } catch { return "M"; } });
+  useEffect(() => { applyFontSize(fontStep); try { localStorage.setItem("pdemo.font", fontStep); } catch { /* blocked */ } }, [fontStep]);
   const { me, signOut, status, config } = useSession();
   const pack = usePack();
   const customer = useCustomer();
@@ -64,15 +65,15 @@ export default function AppShell({ children }) {
           </nav>
         )}
         <div className="shell-tools">
-          <ShelfLink />
-          <ModeToggle />
-          <WorkspaceField />
-          <button type="button" aria-pressed={presenter} onClick={() => setPresenter(!presenter)}>Presenter</button>
-          <label className="shell-theme">Theme
-            <select value={theme} onChange={(e) => pickTheme(e.target.value)}>
-              {THEMES.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
-            </select>
-          </label>
+          <TopMenu
+            theme={{ value: theme, onChange: pickTheme }}
+            fontSize={{ value: fontStep, onChange: setFontStep }}
+            present={{ active: !!presenter, onToggle: () => setPresenter(!presenter), label: "Present" }}
+            help={{ href: "https://github.com/curtismu7/privilege-demo-LAB#readme" }}
+            version={config?.version || null}
+          >
+            <ShelfLink />
+          </TopMenu>
           {status === "anon" && <a className="shell-signin" href="/">Sign in</a>}
         </div>
         {me && (

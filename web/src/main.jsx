@@ -22,6 +22,7 @@ import ApprovalsPage from "./pages/ApprovalsPage";
 import TracePage from "./pages/TracePage";
 import LearnPage from "./pages/LearnPage";
 import DiagramPage from "./pages/DiagramPage";
+import "./top-menu/top-menu.css";
 
 // No router: the page is picked by path (the server answers every path with index.html).
 const ROUTES = { "/policies": PoliciesPage, "/console": ConsolePage, "/approvals": ApprovalsPage, "/trace": TracePage, "/learn": LearnPage, "/diagram": DiagramPage };
