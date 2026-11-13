@@ -1,6 +1,6 @@
-// Copied from id-jag-standalone (origin/main) web/src/story/fill.js, unchanged.
+// Copied from the ID-JAG kit (id-jag-standalone web/src/story/fill.js). Unchanged.
 // Story text is written once with tokens; a vertical pack supplies the names and nouns.
-//   {{lena}}          a cast id, replaced by that person's name
+//   {{lena}}          a cast id, replaced by that person's name (the {{cast.*}} family: the id resolves through vertical.cast)
 //   {{vocab.partner}} a vocabulary entry of the vertical
 // A customer persona ({ lena: "Priya" }) overrides a cast name.
 // A token nothing defines stays visible as ⟨missing: token⟩ so a gap is seen, not hidden.
