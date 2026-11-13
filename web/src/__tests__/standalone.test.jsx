@@ -26,8 +26,7 @@ afterEach(() => { setPresenter(false); vi.unstubAllGlobals(); delete document.do
 describe("Mock/Live toggle and banner, in the header of every page", () => {
   it("shows the current mode in the toggle and in the banner (mock)", () => {
     shell(mock);
-    expect(screen.getByRole("button", { name: "Mock" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("button", { name: "Live" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByTestId("mode-select")).toHaveValue("mock");
     const banner = screen.getByTestId("mode-banner");
     expect(banner).toHaveAttribute("data-state", "mock");
     expect(banner).toHaveTextContent(/Mock mode, simulated/);
@@ -35,23 +34,23 @@ describe("Mock/Live toggle and banner, in the header of every page", () => {
   });
   it("shows live in the toggle and in the banner (live), with the UNVERIFIED label", () => {
     shell(live);
-    expect(screen.getByRole("button", { name: "Live" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("mode-select")).toHaveValue("real");
     expect(screen.getByTestId("mode-banner")).toHaveAttribute("data-state", "live");
     expect(screen.getByTestId("mode-banner")).toHaveTextContent(/UNVERIFIED/);
   });
   it("is there with no session at all (the default context is mock)", () => {
     render(<AppShell />);
-    expect(screen.getByRole("group", { name: "Mode" })).toBeInTheDocument();
+    expect(screen.getByTestId("mode-select")).toBeInTheDocument();
     expect(screen.getByTestId("mode-banner")).toHaveAttribute("data-state", "mock");
   });
   it("asks the server to switch, and shows the fix when live is refused", async () => {
     const setMode = vi.fn(async () => ({ ok: false, status: 409, data: { error: "live_not_configured", liveFix: "Set PF_URL and PF_AUDIENCE in ~/Development/.env, then restart." } }));
     const value = { status: "anon", me: null, config: mock, refresh: vi.fn(), signIn: vi.fn(), signOut: vi.fn(), setMode };
     render(<SessionContext.Provider value={value}><AppShell /></SessionContext.Provider>);
-    fireEvent.click(screen.getByRole("button", { name: "Live" }));
+    fireEvent.change(screen.getByTestId("mode-select"), { target: { value: "real" } });
     expect(setMode).toHaveBeenCalledWith("live");
     expect(await screen.findByRole("alert")).toHaveTextContent(/PF_URL and PF_AUDIENCE/);
-    fireEvent.click(screen.getByRole("button", { name: "Mock" })); // already mock: no call
+    fireEvent.change(screen.getByTestId("mode-select"), { target: { value: "mock" } }); // already mock: no call
     expect(setMode).toHaveBeenCalledTimes(1);
   });
   it("the real session provider shows the fix for Live without sending the PUT that would answer 409, and loads the session without a 401", async () => {
@@ -61,7 +60,7 @@ describe("Mock/Live toggle and banner, in the header of every page", () => {
       "GET /api/auth/mock/personas": { personas: [] },
     });
     render(<SessionProvider><AppShell /></SessionProvider>);
-    fireEvent.click(await screen.findByRole("button", { name: "Live" }));
+    fireEvent.change(await screen.findByTestId("mode-select"), { target: { value: "real" } });
     expect(await screen.findByRole("alert")).toHaveTextContent(/PF_URL and PF_AUDIENCE/);
     expect(calls.some((c) => c.method === "PUT")).toBe(false);
     expect(calls.some((c) => c.url === "/api/me")).toBe(false);
@@ -80,9 +79,9 @@ describe("presenter mode", () => {
     fireEvent.click(screen.getByRole("button", { name: "Presenter" }));
     expect(document.documentElement.dataset.presenter).toBe("on");
     expect(screen.queryByRole("navigation", { name: "Site" })).toBeNull();
-    expect(screen.getByRole("group", { name: "Mode" })).toBeInTheDocument();
+    expect(screen.getByTestId("mode-select")).toBeInTheDocument();
     expect(screen.getByTestId("mode-banner")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Presenter" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Exit present (Esc)" })).toHaveAttribute("aria-pressed", "true");
     fireEvent.keyDown(window, { key: "Escape" });
     expect(document.documentElement.dataset.presenter).toBeUndefined();
     expect(screen.getByRole("navigation", { name: "Site" })).toBeInTheDocument();

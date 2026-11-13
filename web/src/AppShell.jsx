@@ -7,6 +7,7 @@ import { usePack } from "./pack";
 import { useCastName, useCustomer } from "./customer";
 import { setPresenter, usePresenter } from "./presenter";
 import ShelfLink from "./components/ShelfLink";
+import WorkspaceField from "./components/WorkspaceField";
 import TopMenu, { applyFontSize } from "./top-menu/TopMenu.jsx";
 import ModeBanner from "./components/ModeBanner";
 
@@ -28,9 +29,10 @@ function initialTheme() {
 
 export default function AppShell({ children }) {
   const [theme, setTheme] = useState(initialTheme);
+  const [modeNote, setModeNote] = useState("");
   const [fontStep, setFontStep] = useState(() => { try { return localStorage.getItem("pdemo.font") || "M"; } catch { return "M"; } });
   useEffect(() => { applyFontSize(fontStep); try { localStorage.setItem("pdemo.font", fontStep); } catch { /* blocked */ } }, [fontStep]);
-  const { me, signOut, status, config } = useSession();
+  const { me, signOut, status, config, setMode } = useSession();
   const pack = usePack();
   const customer = useCustomer();
   const castName = useCastName();
@@ -66,12 +68,14 @@ export default function AppShell({ children }) {
         )}
         <div className="shell-tools">
           <TopMenu
+            mode={{ value: config?.mode === "live" ? "real" : "mock", onChange: (m) => { const want = m === "real" ? "live" : "mock"; if (want === (config?.mode || "mock")) return; const r = setMode(want); if (r?.then) r.then((res) => { if (res && res.ok === false) setModeNote(res.data?.liveFix || "Live is not configured."); }); }, realAvailable: config ? config.mode === "live" || config.liveReady !== false : null, realHint: config?.liveFix || undefined }}
             theme={{ value: theme, onChange: pickTheme }}
             fontSize={{ value: fontStep, onChange: setFontStep }}
-            present={{ active: !!presenter, onToggle: () => setPresenter(!presenter), label: "Present" }}
+            present={{ active: !!presenter, onToggle: () => setPresenter(!presenter), label: "Presenter" }}
             help={{ href: "https://github.com/curtismu7/privilege-demo-LAB#readme" }}
             version={config?.version || null}
           >
+            <WorkspaceField />
             <ShelfLink />
           </TopMenu>
           {status === "anon" && <a className="shell-signin" href="/">Sign in</a>}
@@ -84,6 +88,7 @@ export default function AppShell({ children }) {
           </p>
         )}
       </header>
+      {modeNote && <p className="notice" role="alert">{modeNote}</p>}
       <ModeBanner />
       {pack.notice && <p className="banner" role="note" data-testid="pack-notice"><strong>{pack.id === "utility" ? "Demo pack" : "Pack"}:</strong> {pack.notice}</p>}
       <div id="main" tabIndex={-1}>{children}</div>
