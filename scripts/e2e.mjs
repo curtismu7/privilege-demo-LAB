@@ -252,7 +252,8 @@ try {
     page.on('pageerror', (e) => consoleProblems.push(`signed out: uncaught ${e.message}`));
     for (const p of ['/', '/policies', '/console', '/approvals', '/trace', '/learn', '/diagram']) { await page.goto(`${BASE}${p}`); await page.waitForLoadState('networkidle'); }
     await page.goto(`${BASE}/`);
-    await page.getByRole('button', { name: 'Live' }).click();
+    // The shared TopMenu: choosing Real is refused with a fix shown in an alert.
+    await page.getByTestId('mode-select').selectOption('real');
     await page.getByRole('alert').waitFor(); // the fix text is shown
     await anon.close();
     if (consoleProblems.length) throw new Error(`${consoleProblems.length} console problem(s), first: ${consoleProblems[0]}`);
