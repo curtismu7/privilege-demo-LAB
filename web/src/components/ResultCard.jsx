@@ -1,5 +1,6 @@
 import Badge from "./Badge";
 import Explanation from "./Explanation";
+import Json from "./JsonPane";
 
 // One decision, as the PEP or the test panel returned it: outcome, deciding policy and its reason, what it overrode.
 export default function ResultCard({ title, res, children }) {
@@ -35,7 +36,7 @@ export default function ResultCard({ title, res, children }) {
           {res.problems.map((p, i) => <li key={i}>{typeof p === "string" ? p : p.message}</li>)}
         </ul>
       )}
-      {res.result && <pre className="result__body" aria-label="Tool result">{JSON.stringify(res.result, null, 2)}</pre>}
+      {res.result && <Json value={res.result} label="Tool result" hot={["status", "amount", "env", "merged", "deployed"]} />}
       {children}
     </section>
   );

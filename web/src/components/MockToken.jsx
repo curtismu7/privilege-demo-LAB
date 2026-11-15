@@ -2,6 +2,7 @@ import { useState } from "react";
 import { api } from "../api";
 import { useSession } from "../session";
 import { usePack } from "../pack";
+import Json from "./JsonPane";
 
 // Mock mode only: a mock access token for the signed-in person, so the /mcp door can be tried from a terminal with no PingFederate.
 // Shown whole (rule 4: mock tokens are raw) and labelled mock. It is signed by the in-process mock issuer and only this app accepts it.
@@ -27,7 +28,7 @@ export default function MockToken() {
       {out && (
         <div aria-live="polite">
           <p><strong>MOCK TOKEN</strong> <span className="muted">{out.label}</span></p>
-          <pre className="result__body token-box" aria-label="Mock access token">{out.access_token}</pre>
+          <Json value={out.access_token} label="Mock access token" />
           <pre className="result__body" aria-label="Example call">{`curl -s ${window.location.origin}/mcp \\
   -H 'authorization: Bearer <the token above>' -H 'content-type: application/json' \\
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'`}</pre>
