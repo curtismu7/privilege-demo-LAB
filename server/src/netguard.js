@@ -11,11 +11,16 @@ export const LIVE_TIMEOUT_MS = 10_000;
 export function createNetguard({ mode, liveOrigin, realFetch = globalThis.fetch, timeoutMs = LIVE_TIMEOUT_MS }) {
   const stats = { realAttempts: 0, refused: 0 };
   const refuse = (why) => { stats.refused += 1; throw new NetguardRefused(why); };
+  // Extra origins Real mode may reach (the gateway door origin). Empty in mock-only deployments.
+  const extraOrigins = new Set();
+  const addAllowedOrigin = (origin) => { try { extraOrigins.add(new URL(origin).origin); } catch { /* ignore */ } };
+  const extraAllowed = (target) => extraOrigins.has(target.origin);
 
   async function fetchImpl(url, init = {}) {
-    if (mode() !== 'live') refuse('Mock mode: no outbound calls');
     let target;
     try { target = new URL(typeof url === 'string' ? url : url.url ?? String(url)); } catch { return refuse('Not a URL'); }
+    if (extraAllowed(target)) { stats.realAttempts += 1; return realFetch(target.toString(), { ...init, redirect: 'manual', signal: init.signal ?? AbortSignal.timeout(timeoutMs) }); }
+    if (mode() !== 'live') refuse('Mock mode: no outbound calls');
     const origin = liveOrigin();
     if (!origin || target.origin !== origin) refuse('Live mode: only the configured PingFederate may be called');
     if (target.username || target.password) refuse('Outbound URLs must not carry credentials');
@@ -41,5 +46,5 @@ export function createNetguard({ mode, liveOrigin, realFetch = globalThis.fetch,
     return { ok: checks.every((c) => c.ok), checks };
   }
 
-  return { fetchImpl, selfTest, stats: () => ({ ...stats }) };
+  return { fetchImpl, addAllowedOrigin, selfTest, stats: () => ({ ...stats }) };
 }
