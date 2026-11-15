@@ -15,6 +15,7 @@ import { createPfVerifier, createVerifier } from './auth/pf.js';
 import { createPiFlowLogin } from './auth/piflowLogin.js';
 import { createMockIdp } from './mockIdp.js';
 import { createNetguard } from './netguard.js';
+import { readFileSettings, doorConfig as parseDoorConfig, createRealDoor } from './gatewayReal.js';
 import { loadCustomerConfig, publicConfig } from './customer.js';
 import { createWorkspaces, validWorkspace, WorkspaceError, DEFAULT_WORKSPACE, WORKSPACE_HEADER } from './workspaces.js';
 import { createBackend } from './mcp/backend.js';
@@ -60,6 +61,18 @@ export function createApp({ cfg = config(), now = () => Date.now(), fetchImpl = 
   // The netguard is the only door out: nothing leaves the process in mock mode; live mode reaches only the configured PingFederate.
   const netguard = createNetguard({ mode, liveOrigin: () => { try { return new URL(cfg.pfJwksUrl || cfg.pfUrl).origin; } catch { return null; } }, realFetch: fetchImpl });
   app.locals.netguard = netguard; // tests and the doctor read its counters
+  // The real Privilege-gateway hop (gatewayReal.js): an agent key from the shared settings file calling a live
+  // door. The door's fetches go through the netguard's allowed origin list — the netguard extends here.
+  const gatewayDoor = (() => {
+    try {
+      const text = fs.readFileSync(process.env.STANDALONE_ENV || `${process.env.HOME || ''}/Development/.env`, 'utf8');
+      const cfgText = text + Object.entries(process.env).filter(([k]) => k.startsWith('PDG_GW_')).map(([k, v]) => `\n${k}=${v}`).join('');
+      const parsed = parseDoorConfig(cfgText, 'PDG');
+      return parsed.ok ? createRealDoor({ config: parsed, clientInfo: { name: 'privilege-demo', version: '0.3.0' } }) : null;
+    } catch { return null; }
+  })();
+  if (gatewayDoor) netguard.addAllowedOrigin?.(gatewayDoor.origin);
+  app.locals.gatewayDoor = gatewayDoor;
   const mockIdp = createMockIdp({ now, personas: PERSONAS, agent: AGENT });
   const verifyMock = createVerifier({ keySource: mockIdp.publicKey, issuer: mockIdp.issuer, audience: mockIdp.audience, clockSkewSec: cfg.clockSkewSec });
   const verifyPf = cfg.pfJwksUrl ? createPfVerifier(cfg, { fetchImpl: netguard.fetchImpl }) : null;
@@ -220,6 +233,20 @@ export function createApp({ cfg = config(), now = () => Date.now(), fetchImpl = 
     return res.json(modeView(req));
   });
   app.get('/api/preflight', wrap(async (req, res) => res.json(await preflight(wsOf(req).store))));
+
+  // The real Privilege-gateway check: one tools/list through the door with the agent key, then the gateway's
+  // refusal for a tool nothing grants. Independent of the mock/live auth mode; the netguard allows exactly this door.
+  app.post('/api/gateway-check', wrap(async (req, res) => {
+    if (!gatewayDoor) return res.status(409).json({ error: 'real_not_configured', fix: 'Set PDG_GW_URL, PDG_GW_APPS and at least one PDG_GW_KEY_<NAME> in the shared settings file (~/Development/.env, or STANDALONE_ENV). Mock keeps working.' });
+    if (req.body && Object.keys(req.body).some((k) => !['app', 'caller'].includes(k))) return res.status(400).json({ error: 'bad_request', fix: 'the only accepted body fields are { "app", "caller" }' });
+    const app = String(req.body?.app || gatewayDoor.apps[0]);
+    if (!gatewayDoor.apps.includes(app)) return res.status(400).json({ error: 'bad_app', fix: `app must be one of ${gatewayDoor.apps.join(', ')}` });
+    const caller = req.body?.caller && gatewayDoor.callers.some((c) => c.id === req.body.caller) ? req.body.caller : gatewayDoor.callers[0].id;
+    const listing = await gatewayDoor.list(app, caller);
+    const out = { app, caller, gateway: gatewayDoor.origin, ...(gatewayDoor.version ? { version: gatewayDoor.version } : {}), listing };
+    if (listing.ok) out.refusal = await gatewayDoor.call(app, caller, 'privilege_demo_refusal_probe_tool', {});
+    res.json(out);
+  }));
   app.get('/api/auth/config', (req, res) => res.json({
     idp: mode() === 'live' ? 'pf' : 'local-mock', mode: mode(), liveReady: liveReady(), ...liveFix(), workspace: req.workspaceId,
     mockAvailable: !mockRefusal(req), mockRefusal: mockRefusal(req), bearer: mode() === 'live' ? Boolean(verifyPf) : true, pack: publicPack(pack),
