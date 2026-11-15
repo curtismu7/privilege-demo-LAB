@@ -14,7 +14,7 @@ const LAYER_LABEL = {
   other: 'the gateway refused (see its own words below)',
 };
 
-export default function PrivilegeCheck({ apiBase = '', title = 'Privilege gateway' }) {
+export default function PrivilegeCheck({ apiBase = '', title = 'Privilege gateway', primaryRetry = false }) {
   const [state, setState] = useState({ phase: 'idle' });
 
   const refresh = useCallback(async () => {
@@ -48,9 +48,15 @@ export default function PrivilegeCheck({ apiBase = '', title = 'Privilege gatewa
     <section className="pcard" data-testid="privilege-check" aria-label={title}>
       <header className="pcard__head">
         <h3 className="pcard__title">{title}</h3>
-        <button type="button" className="pcard__retry" onClick={refresh} disabled={state.phase === 'checking'}>
-          {state.phase === 'checking' ? 'Checking…' : 'Run the gateway check'}
-        </button>
+        {primaryRetry ? (
+          <button type="button" className="pcard__retry primary" onClick={refresh} disabled={state.phase === 'checking'}>
+            {state.phase === 'checking' ? 'Checking…' : 'Run the gateway check'}
+          </button>
+        ) : (
+          <button type="button" className="pcard__retry" onClick={refresh} disabled={state.phase === 'checking'}>
+            {state.phase === 'checking' ? 'Checking…' : 'Run the gateway check'}
+          </button>
+        )}
       </header>
 
       {state.phase === 'checking' && <p className="pcard__note">Calling the live gateway door…</p>}

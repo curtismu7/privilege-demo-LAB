@@ -33,7 +33,7 @@ initPresenter();
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <SessionProvider>
-      <AppShell><Page /><PrivilegeCheck /></AppShell>
+      <AppShell><Page />{window.location.pathname === "/learn" ? <PrivilegeCheck primaryRetry /> : <PrivilegeCheck />}</AppShell>
     </SessionProvider>
   </StrictMode>,
 );
