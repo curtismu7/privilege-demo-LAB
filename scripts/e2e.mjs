@@ -129,7 +129,7 @@ try {
 
     await priya.page.getByRole('button', { name: 'Approve book_fare' }).click();
     await priya.page.getByText('Approved the book_fare request.').waitFor();
-    has(await priya.page.getByRole('region', { name: 'Tool result' }).or(priya.page.getByLabel('Tool result')).innerText(), 'BK-', 'booking confirmation');
+    has(await priya.page.getByRole('region', { name: 'Tool result' }).or(priya.page.getByLabel('Tool result', { exact: true })).innerText(), 'BK-', 'booking confirmation');
     await shot(priya.page, 'S01-4-priya-approved');
 
     await mark.page.goto(`${BASE}/approvals`);
