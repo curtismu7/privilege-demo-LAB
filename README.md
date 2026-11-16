@@ -232,3 +232,8 @@ page) — one live `tools/list` through the door with the key, then one `tools/c
 tool no policy grants, so you see the gateway's own refusal shape. The gateway's words come
 back unaltered (keys scrubbed). Settings keys: `PDG_GW_URL`, `PDG_GW_APPS`,
 `PDG_GW_KEY_<NAME>` (optional `PDG_GW_VERSION`).
+
+**What Privilege did (Rule 25).** Both paths show the exact request, the exact response and the decisions in between, in the shared
+`GatewayTrace` panel. The Tool console shows it under each call: the lab's own simulated gateway (the Cedar PEP) computed every decision,
+so each is marked *checked*. The Privilege gateway card shows it for the live check: a real gateway reports no per-check detail, so
+those decisions are marked *inferred* (read from the outcome) or *observed* (read from the reply), never *checked*. No key, token or cookie appears in either.

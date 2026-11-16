@@ -5,6 +5,7 @@
 // scrubs every message. No dependency beyond React and the shared standalone-ui.css tokens.
 import { useEffect, useState, useCallback } from 'react';
 import './privilege-check.css';
+import GatewayTrace from '../gateway-trace/GatewayTrace';
 
 const LAYER_LABEL = {
   key: 'the gateway refused the key (401)',
@@ -109,6 +110,7 @@ export default function PrivilegeCheck({ apiBase = '', title = 'Privilege gatewa
           )}
 
           <p className="pcard__how">Real mode here = one live call through the PingOne Privilege gateway with an agent access key from the shared settings file. The key is write-only and never shown.</p>
+          {state.exchanges && <GatewayTrace exchanges={state.exchanges} source="real" />}
         </>
       )}
     </section>

@@ -12,6 +12,7 @@ import TryThis from "../components/TryThis";
 import MockToken from "../components/MockToken";
 import RequireSignIn from "../components/RequireSignIn";
 import ResultCard from "../components/ResultCard";
+import GatewayTrace from "../gateway-trace/GatewayTrace";
 import { PageStories } from "../story/StoryPanel";
 
 const titleCase = (s) => String(s).split(/[-_\s]+/).filter(Boolean).map((w) => w[0].toUpperCase() + w.slice(1)).join(" ");
@@ -84,6 +85,7 @@ function Console() {
           </label>
           <div className="row"><button type="button" className="primary" ref={callRef} onClick={call} disabled={busy || !tool}>Call as {name}</button></div>
           <div aria-live="polite"><ResultCard title="PEP decision" res={res} /></div>
+          {res?.exchanges && <GatewayTrace exchanges={res.exchanges} source="mock" />}
         </section>
 
         <section className="card" aria-labelledby="tools-h">
