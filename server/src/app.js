@@ -15,7 +15,7 @@ import { createPfVerifier, createVerifier } from './auth/pf.js';
 import { createPiFlowLogin } from './auth/piflowLogin.js';
 import { createMockIdp } from './mockIdp.js';
 import { createNetguard } from './netguard.js';
-import { readFileSettings, doorConfig as parseDoorConfig, createRealDoor } from './gatewayReal.js';
+import { readFileSettings, doorConfig as parseDoorConfig, createRealDoor, rule19View } from './gatewayReal.js';
 import { loadCustomerConfig, publicConfig } from './customer.js';
 import { createWorkspaces, validWorkspace, WorkspaceError, DEFAULT_WORKSPACE, WORKSPACE_HEADER } from './workspaces.js';
 import { createBackend } from './mcp/backend.js';
@@ -232,6 +232,8 @@ export function createApp({ cfg = config(), now = () => Date.now(), fetchImpl = 
     currentMode = next;
     return res.json(modeView(req));
   });
+  // The Privilege gateway card's question (rule 19 shape): realAvailable means the gateway door is configured, not live mode.
+  app.get('/api/info', (_req, res) => { res.set('Cache-Control', 'no-store'); res.json(rule19View(gatewayDoor, mode())); });
   app.get('/api/preflight', wrap(async (req, res) => res.json(await preflight(wsOf(req).store))));
 
   // The real Privilege-gateway check: one tools/list through the door with the agent key, then the gateway's
