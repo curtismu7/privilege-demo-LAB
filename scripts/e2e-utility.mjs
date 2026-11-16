@@ -125,7 +125,7 @@ try {
     await shot(priya.page, 'S62-2-priya-sees');
     await priya.page.getByRole('button', { name: 'Approve backlog.update_story' }).click();
     await priya.page.getByText('Approved the backlog.update_story request.').waitFor();
-    has(await priya.page.getByLabel('Tool result').innerText(), 'updated', 'mock result');
+    has(await priya.page.getByLabel('Tool result', { exact: true }).innerText(), 'updated', 'mock result');
     await shot(priya.page, 'S62-3-approved');
     const again = await call(ben.page, 'backlog.update_story', { storyId: 'ST-102', change: 'Reword' });
     eq(again.badge, 'Hold', 'second update');

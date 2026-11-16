@@ -10,6 +10,7 @@ import LearnPage from "../LearnPage";
 import PoliciesPage from "../PoliciesPage";
 import TracePage from "../TracePage";
 import { PEOPLE, TOOLS, mockApi, renderAs, reply } from "../../testUtils";
+import { setJsonView } from "../../components/JsonPane";
 import { STORIES } from "../../story/stories";
 import { reloadStoryPrefs } from "../../story/useStoryPrefs";
 
@@ -266,6 +267,19 @@ describe("Approvals", () => {
   const pending = { id: "id-1", status: "pending", tool: "book_fare", app: "booking", args: { flightId: "FL200", amount: 2400 }, requester: { sub: "mark", actor: "dot" },
     policy: { rule: "s01-hold-large-fare", reason: "Fares over 1000 need a second pair of eyes" }, approvers: ["priya"], justification: "client dinner",
     createdAt: "2026-10-21T10:00:00.000Z", expiresAt: "2026-10-21T10:10:00.000Z", decidedBy: null, decidedAt: null, outcome: null };
+
+  it("shows the held call's arguments in a Form | JSON pane with the amount marked", async () => {
+    setJsonView("form");
+    mockApi({ "GET /api/approvals": { approvals: [pending] } });
+    renderAs(<ApprovalsPage />, { me: PEOPLE.priya });
+    const form = await screen.findByLabelText("Arguments");
+    expect(form.querySelector('[data-hot="true"]')).toHaveTextContent("amount");
+    fireEvent.click(within(form.closest(".jsonbox")).getByRole("button", { name: "JSON" }));
+    const pane = screen.getByLabelText("Arguments");
+    expect(pane.tagName).toBe("PRE");
+    expect(pane.textContent).toBe(JSON.stringify(pending.args, null, 2));
+    setJsonView("form");
+  });
 
   it("lets the named approver approve, and shows that the call completed", async () => {
     let done = false;
