@@ -12,6 +12,7 @@ import "@fontsource/ibm-plex-mono/600.css";
 // The family's shared stylesheet first (tokens, controls, dark mode, banner), then this app's own layout.
 import "./standalone-ui.css";
 import "./components/JsonPane.css";
+import "./components/VerifyMark.css";
 import "./app.css";
 import AppShell from "./AppShell";
 import { SessionProvider } from "./session";
