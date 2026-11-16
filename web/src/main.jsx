@@ -25,7 +25,7 @@ import TracePage from "./pages/TracePage";
 import LearnPage from "./pages/LearnPage";
 import DiagramPage from "./pages/DiagramPage";
 import "./top-menu/top-menu.css";
-import PrivilegeCheck from "./privilege-check/PrivilegeCheck.jsx";
+import GatewayCheckCard from "./privilege-check/GatewayCheckCard.jsx";
 
 // No router: the page is picked by path (the server answers every path with index.html).
 const ROUTES = { "/policies": PoliciesPage, "/console": ConsolePage, "/approvals": ApprovalsPage, "/trace": TracePage, "/learn": LearnPage, "/diagram": DiagramPage };
@@ -35,7 +35,7 @@ initPresenter();
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <SessionProvider>
-      <AppShell><Page />{window.location.pathname === "/learn" ? <PrivilegeCheck primaryRetry /> : <PrivilegeCheck />}</AppShell>
+      <AppShell><Page />{window.location.pathname === "/learn" ? <GatewayCheckCard primaryRetry /> : <GatewayCheckCard />}</AppShell>
     </SessionProvider>
   </StrictMode>,
 );

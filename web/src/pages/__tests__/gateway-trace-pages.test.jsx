@@ -1,7 +1,7 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import ConsolePage from "../ConsolePage";
-import PrivilegeCheck from "../../privilege-check/PrivilegeCheck";
+import GatewayCheckCard from "../../privilege-check/GatewayCheckCard";
 import { PEOPLE, TOOLS, mockApi, renderAs } from "../../testUtils";
 import { setJsonView } from "../../components/JsonPane";
 // Traces are built by the server's own builders, so the page is tested against the shape the server really sends.
@@ -53,7 +53,7 @@ describe("Privilege gateway card: What Privilege did (real)", () => {
     exchanges.forEach((e) => expect(assertTrace(e.trace)).toEqual([]));
     const { wire: _w, ...shownListing } = listing;
     mockApi({ "GET /api/info": { source: "mock", realAvailable: true, realReason: null }, "POST /api/gateway-check": { app: "travel-door", caller: "travel_agent", gateway: "https://gateway.example", listing: shownListing, exchanges } });
-    renderAs(<PrivilegeCheck />);
+    renderAs(<GatewayCheckCard />);
     const panel = await screen.findByTestId("gateway-trace");
     expect(screen.getByTestId("gateway-trace-basis")).toHaveTextContent(/Real gateway/);
     const decisions = within(panel).getByTestId("trace-1-decisions");
@@ -64,7 +64,7 @@ describe("Privilege gateway card: What Privilege did (real)", () => {
 
   it("shows no panel when the gateway is not configured", async () => {
     mockApi({ "GET /api/info": { source: "mock", realAvailable: false, realReason: "Real needs the gateway settings" } });
-    renderAs(<PrivilegeCheck />);
+    renderAs(<GatewayCheckCard />);
     await screen.findByText(/Real needs the gateway settings/);
     expect(screen.queryByTestId("gateway-trace")).toBeNull();
   });
