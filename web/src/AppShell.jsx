@@ -7,6 +7,7 @@ import { usePack } from "./pack";
 import { useCastName, useCustomer } from "./customer";
 import { setPresenter, usePresenter } from "./presenter";
 import ShelfLink from "./components/ShelfLink";
+import VerifyMark from "./components/VerifyMark.jsx";
 import WorkspaceField from "./components/WorkspaceField";
 import TopMenu, { applyFontSize } from "./top-menu/TopMenu.jsx";
 import ModeBanner from "./components/ModeBanner";
@@ -77,6 +78,7 @@ export default function AppShell({ children }) {
           >
             <WorkspaceField />
             <ShelfLink />
+            <VerifyMark id="privilege-demo" />
           </TopMenu>
           {status === "anon" && <a className="shell-signin" href="/">Sign in</a>}
         </div>
