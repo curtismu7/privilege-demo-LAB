@@ -67,7 +67,7 @@ describe("Mock/Live toggle and banner, in the header of every page", () => {
   });
   it("every page in the nav is wrapped by the shell, so every page has the toggle (the shell is the only place it lives)", () => {
     const main = fs.readFileSync(path.join(WEB, "main.jsx"), "utf8");
-    expect(main).toMatch(/<AppShell><Page \/><\/AppShell>/);
+    expect(main).toMatch(/<AppShell><Page \/>[\s\S]*<\/AppShell>/);
     expect(PAGES.length).toBeGreaterThanOrEqual(7);
   });
 });

@@ -95,7 +95,6 @@ button.danger { color: var(--danger-text); }
 .persona-button { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; margin: 6px 0; text-align: left; }
 .guards { margin: 10px 0 0; padding: 0; list-style: none; font-size: 13px; }
 .guards li { margin: 4px 0; }
-.token-box { word-break: break-all; }
 
 
 /* ---- explanations, rule chips, guided start (sizes in em so presenter mode, which raises the body size, grows them too) ---- */

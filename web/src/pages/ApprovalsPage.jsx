@@ -4,6 +4,7 @@ import { useSession } from "../session";
 import { usePack } from "../pack";
 import Badge from "../components/Badge";
 import Explanation from "../components/Explanation";
+import Json from "../components/JsonPane";
 import RequireSignIn from "../components/RequireSignIn";
 import { PageStories } from "../story/StoryPanel";
 
@@ -40,7 +41,7 @@ function Approvals() {
             <li key={a.id} className="card">
               <h2><code>{a.tool}</code> <Badge kind={a.status} /></h2>
               <dl className="result__facts">
-                <dt>Arguments</dt><dd><code>{JSON.stringify(a.args)}</code></dd>
+                <dt>Arguments</dt><dd><Json value={a.args} label="Arguments" hot={["amount"]} /></dd>
                 <dt>Asked by</dt><dd>{a.requester.sub}{a.requester.actor ? ` (through ${a.requester.actor})` : ""}</dd>
                 <dt>Held by</dt><dd><code>{a.policy.rule}</code> {a.policy.reason}</dd>
                 <dt>Approvers</dt><dd>{a.approvers.join(", ")}</dd>
@@ -54,7 +55,7 @@ function Approvals() {
                   <Explanation explanation={a.outcome?.explanation ?? a.explanation} />
                 </details>
               )}
-              {a.outcome?.result && <pre className="result__body" aria-label="Tool result">{JSON.stringify(a.outcome.result, null, 2)}</pre>}
+              {a.outcome?.result && <Json value={a.outcome.result} label="Tool result" hot={["status", "amount", "env", "merged", "deployed"]} />}
               {mayDecide(a) ? (
                 <>
                 <p className="muted">If you approve, the rules are checked again with one approval recorded and the tool runs once.</p>
