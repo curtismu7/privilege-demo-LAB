@@ -16,6 +16,7 @@ import { createPiFlowLogin } from './auth/piflowLogin.js';
 import { createMockIdp } from './mockIdp.js';
 import { createNetguard } from './netguard.js';
 import { readFileSettings, doorConfig as parseDoorConfig, createRealDoor, rule19View } from './gatewayReal.js';
+import { pepTrace, gatewayCheckExchanges, stripWire } from './gatewayExchanges.js';
 import { loadCustomerConfig, publicConfig } from './customer.js';
 import { createWorkspaces, validWorkspace, WorkspaceError, DEFAULT_WORKSPACE, WORKSPACE_HEADER } from './workspaces.js';
 import { createBackend } from './mcp/backend.js';
@@ -68,7 +69,7 @@ export function createApp({ cfg = config(), now = () => Date.now(), fetchImpl = 
       const text = fs.readFileSync(process.env.STANDALONE_ENV || `${process.env.HOME || ''}/Development/.env`, 'utf8');
       const cfgText = text + Object.entries(process.env).filter(([k]) => k.startsWith('PDG_GW_')).map(([k, v]) => `\n${k}=${v}`).join('');
       const parsed = parseDoorConfig(cfgText, 'PDG');
-      return parsed.ok ? createRealDoor({ config: parsed, clientInfo: { name: 'privilege-demo', version: '0.3.0' } }) : null;
+      return parsed.ok ? createRealDoor({ config: parsed, clientInfo: { name: 'privilege-demo', version: '0.3.0' }, capture: true }) : null;
     } catch { return null; }
   })();
   if (gatewayDoor) netguard.addAllowedOrigin?.(gatewayDoor.origin);
@@ -245,8 +246,11 @@ export function createApp({ cfg = config(), now = () => Date.now(), fetchImpl = 
     if (!gatewayDoor.apps.includes(app)) return res.status(400).json({ error: 'bad_app', fix: `app must be one of ${gatewayDoor.apps.join(', ')}` });
     const caller = req.body?.caller && gatewayDoor.callers.some((c) => c.id === req.body.caller) ? req.body.caller : gatewayDoor.callers[0].id;
     const listing = await gatewayDoor.list(app, caller);
-    const out = { app, caller, gateway: gatewayDoor.origin, ...(gatewayDoor.version ? { version: gatewayDoor.version } : {}), listing };
-    if (listing.ok) out.refusal = await gatewayDoor.call(app, caller, 'privilege_demo_refusal_probe_tool', {});
+    const out = { app, caller, gateway: gatewayDoor.origin, ...(gatewayDoor.version ? { version: gatewayDoor.version } : {}), listing: stripWire(listing) };
+    const refusal = listing.ok ? await gatewayDoor.call(app, caller, 'privilege_demo_refusal_probe_tool', {}) : undefined;
+    if (refusal) out.refusal = stripWire(refusal);
+    // "What Privilege did" (Rule 25): the exact exchanges, from the hop's redacted wire capture.
+    out.exchanges = gatewayCheckExchanges(listing, refusal);
     res.json(out);
   }));
   app.get('/api/auth/config', (req, res) => res.json({
@@ -341,7 +345,13 @@ export function createApp({ cfg = config(), now = () => Date.now(), fetchImpl = 
     const out = wsOf(req).pep.enforce({ claims, tool, args: args ?? {}, source: req.principal.source, traceparent: req.principal.traceparent, justification });
     res.set('traceparent', out.traceparent);
     // ?envelope=1 (the web console): always 200 with the outcome in the body, because a Deny is a result and not a failed request.
-    return res.status(req.query.envelope === '1' ? 200 : STATUS[out.outcome]).json(publicOutcome(out));
+    // The console also gets "What Privilege did" (Rule 25): this exchange as the simulated gateway handled it, beside the outcome it shows.
+    if (req.query.envelope === '1') {
+      const shown = publicOutcome(out);
+      const exchanges = [{ step: 1, title: `Tool call: ${typeof tool === 'string' ? tool.slice(0, 80) : 'no tool named'}`, status: 200, trace: pepTrace({ body: req.body ?? null, out, sub: req.principal.claims.sub, workspace: req.workspaceId }) }];
+      return res.status(200).json({ ...shown, exchanges });
+    }
+    return res.status(STATUS[out.outcome]).json(publicOutcome(out));
   }));
 
   app.post('/mcp', wrap(async (req, res) => {

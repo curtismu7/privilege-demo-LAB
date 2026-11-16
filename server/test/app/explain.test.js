@@ -52,7 +52,7 @@ describe('POST /api/tools/call carries the explanation', () => {
   it('the explanation does not change the body that was already there', async () => {
     const { mark } = await world();
     const r = await call(mark, 'book_fare', fare(800));
-    const { explanation, ...rest } = r.body;
+    const { explanation, exchanges, ...rest } = r.body; // exchanges: "What Privilege did" (Rule 25), asserted in gateway-trace.test.js
     expect(explanation).toBeDefined();
     expect(Object.keys(rest).sort()).toEqual(['app', 'outcome', 'overridden', 'problems', 'reason', 'result', 'rule', 'rules', 'trace_id']);
   });
