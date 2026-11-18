@@ -139,6 +139,18 @@ describe('HITL: hold, approve, deny, expiry (S01, S03)', () => {
     const own = (await call(priya, 'book_fare', fare(2400), { asAgent: true })).body.approvalId;
     expect((await priya.post(`/api/approvals/${own}/approve`)).status).toBe(403);
   });
+  it('Let-it-expire: the demo knob retires a pending request now; a decided one is 409; a stranger gets 404', async () => {
+    const { mark, priya, mary } = await world();
+    const id = (await call(mark, 'book_fare', fare(2400), { asAgent: true })).body.approvalId;
+    expect((await mark.post(`/api/approvals/${id}/expire`)).status).toBe(200);
+    const v = (await mark.get(`/api/approvals/${id}`)).body;
+    expect(v).toMatchObject({ status: 'expired', outcome: { decision: 'deny', rule: 'approval-expired', executed: false } });
+    expect((await priya.post(`/api/approvals/${id}/approve`)).status).toBe(409);
+    expect((await mark.post(`/api/approvals/${id}/expire`)).status).toBe(409);
+    const other = (await call(mark, 'book_fare', fare(2500), { asAgent: true })).body.approvalId;
+    expect((await mary.post(`/api/approvals/${other}/expire`)).status).toBe(404);
+    expect((await priya.get(`/api/approvals/${other}`)).body.status).toBe('pending');
+  });
   it('expires after 10 minutes on the injected clock: deny, and approving is refused', async () => {
     const { ctx, mark, priya } = await world();
     const held = await call(mark, 'book_fare', fare(2400), { asAgent: true });

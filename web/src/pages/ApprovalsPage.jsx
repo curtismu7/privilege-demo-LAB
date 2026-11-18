@@ -25,6 +25,11 @@ function Approvals() {
     setMessage(r.ok ? `${verb === "approve" ? "Approved" : "Denied"} the ${a.tool} request.` : `Could not ${verb} (${r.data?.error ?? r.status}).`);
     await load();
   };
+  const expire = async (a) => {
+    const r = await api(`/api/approvals/${a.id}/expire`, { method: "POST" });
+    setMessage(r.ok ? `The ${a.tool} request expired; the call stays denied.` : `Could not expire it (${r.data?.error ?? r.status}).`);
+    await load();
+  };
 
   return (
     <main className="page">
@@ -65,7 +70,10 @@ function Approvals() {
                 </div>
                 </>
               ) : a.status === "pending" && (
-                <p className="muted">{a.requester.sub === me.sub ? "You asked for this; someone else has to answer it." : "Only the named approvers can answer this."}</p>
+                <p className="muted">
+                  {a.requester.sub === me.sub ? "You asked for this; someone else has to answer it." : "Only the named approvers can answer this."}{" "}
+                  <button type="button" className="linkish" onClick={() => expire(a)}>Let it expire</button>
+                </p>
               )}
             </li>
           ))}
