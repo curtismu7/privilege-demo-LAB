@@ -313,6 +313,14 @@ describe("Approvals", () => {
     await waitFor(() => expect(calls.some((c) => c.url === "/api/approvals/id-1/deny")).toBe(true));
   });
 
+  it("offers Let it expire on a pending request, and the requester can use it too", async () => {
+    const calls = mockApi({ "GET /api/approvals": { approvals: [pending] }, "POST /api/approvals/id-1/expire": {} });
+    renderAs(<ApprovalsPage />, { me: PEOPLE.mark });
+    fireEvent.click(await screen.findByRole("button", { name: "Let it expire" }));
+    expect(await screen.findByText("The book_fare request expired; the call stays denied.")).toBeInTheDocument();
+    expect(calls.some((c) => c.method === "POST" && c.url === "/api/approvals/id-1/expire")).toBe(true);
+  });
+
   it("gives the requester no buttons, and says why", async () => {
     mockApi({ "GET /api/approvals": { approvals: [pending] } });
     renderAs(<ApprovalsPage />, { me: PEOPLE.mark });

@@ -40,6 +40,16 @@ export function createApprovals({ now, ttlMs, onExpire = () => {} }) {
     },
     get(id) { sweep(); return items.get(id) ?? null; },
     list() { sweep(); return [...items.values()].reverse(); },
+    // Demo knob: retire a pending request now, the same way the clock would have. Non-pending ids are ignored.
+    expire(id) {
+      const r = items.get(id);
+      if (!r || r.status !== 'pending') return null;
+      r.status = 'expired';
+      r.decidedAt = new Date(now()).toISOString();
+      r.outcome = { decision: 'deny', rule: 'approval-expired', reason: 'No approver answered in time, so the call stays denied', executed: false };
+      try { onExpire(r); } catch { /* an observer must not break the queue */ }
+      return r;
+    },
     clear() { items.clear(); },
   };
 }

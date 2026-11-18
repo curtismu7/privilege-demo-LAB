@@ -397,6 +397,14 @@ export function createApp({ cfg = config(), now = () => Date.now(), fetchImpl = 
       return res.json(approvals.view(r));
     }));
   }
+  // Demo knob: let a pending request expire now instead of waiting out the TTL. Same end state the clock produces.
+  app.post('/api/approvals/:id/expire', authed({}, (req, res) => {
+    const { approvals } = wsOf(req);
+    const r = approvals.get(req.params.id);
+    if (!r || !mine(req.principal.claims, r)) return res.status(404).json({ error: 'not_found' });
+    if (r.status !== 'pending') return res.status(409).json({ error: r.status === 'expired' ? 'expired' : 'already_decided', status: r.status });
+    return res.json(approvals.view(approvals.expire(r.id)));
+  }));
 
   // ---- policies (admin) ----
   const problemsOut = (problems) => problems.map((p) => ({ policyId: p.policyId ?? null, message: p.message }));
