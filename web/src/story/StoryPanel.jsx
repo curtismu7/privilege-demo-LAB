@@ -90,3 +90,17 @@ export function PageStories({ page, defaultOpen = false }) {
   const presenter = usePresenter(); // presenter mode opens the talk track
   return storiesForPage(page, packId).map((s) => <StoryPanel key={`${s.id}${presenter ? "-p" : ""}`} id={s.id} defaultOpen={defaultOpen || presenter} />);
 }
+
+/** The page's stories flattened into TalkTrackDialog steps (owner, 2026-11-17: one pop-out talk track per page). */
+export function pageTalkSteps(page) {
+  const { id: packId } = usePack();
+  const customer = useCustomer();
+  return storiesForPage(page, packId).flatMap((raw) => {
+    const story = fillAll(raw, withVocabulary(verticalFor(packId, customer.vertical), customer.vocabulary), customer.cast);
+    return [
+      { id: `${story.id}-goal`, title: `${story.id}: ${story.title}`, say: `${story.goal} Obstacle: ${story.obstacle} Control: ${story.control}` },
+      ...story.steps.map((s) => ({ id: `${story.id}-${s.n}`, title: `${story.id}.${s.n} ${s.title}`, say: `${s.say} ${s.why}` })),
+      { id: `${story.id}-proof`, title: `${story.id} proof`, say: `${story.proof.happy} Takeaway: “${story.say}”` },
+    ];
+  });
+}
