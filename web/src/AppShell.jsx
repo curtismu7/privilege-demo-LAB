@@ -11,6 +11,8 @@ import VerifyMark from "./components/VerifyMark.jsx";
 import WorkspaceField from "./components/WorkspaceField";
 import TopMenu, { applyFontSize } from "./top-menu/TopMenu.jsx";
 import ModeBanner from "./components/ModeBanner";
+import TalkTrackDialog from "./talk-track/TalkTrackDialog";
+import { pageTalkSteps } from "./story/StoryPanel";
 
 const THEME_KEY = "privdemo.theme";
 const THEMES = [["auto", "Auto"], ["light", "Light"], ["dark", "Dark"]];
@@ -53,6 +55,7 @@ export default function AppShell({ children }) {
     setTheme(next);
   };
   const name = me ? castName(me.persona, me.name ?? PERSONAS[me.persona]?.name ?? me.sub) : null;
+  const [talkOpen, setTalkOpen] = useState(false);
 
   return (
     <div className="shell">
@@ -73,6 +76,7 @@ export default function AppShell({ children }) {
             theme={{ value: theme, onChange: pickTheme }}
             fontSize={{ value: fontStep, onChange: setFontStep }}
             present={{ active: !!presenter, onToggle: () => setPresenter(!presenter), label: "Presenter" }}
+            talkTrack={{ active: talkOpen, onToggle: () => setTalkOpen((v) => !v) }}
             help={{ href: "https://github.com/curtismu7/privilege-demo-LAB#readme" }}
             version={config?.version || null}
           >
@@ -94,6 +98,12 @@ export default function AppShell({ children }) {
       <ModeBanner />
       {pack.notice && <p className="banner" role="note" data-testid="pack-notice"><strong>{pack.id === "utility" ? "Demo pack" : "Pack"}:</strong> {pack.notice}</p>}
       <div id="main" tabIndex={-1}>{children}</div>
+      <TalkTrackDialog
+        isOpen={talkOpen}
+        onClose={() => setTalkOpen(false)}
+        title={`Talk track · ${here === "/" ? "Sign in" : PAGES.find(([href]) => href === here)?.[1] ?? here}`}
+        talk={pageTalkSteps(here === "/" ? "signin" : here.replace(/^\//, ""))}
+      />
     </div>
   );
 }

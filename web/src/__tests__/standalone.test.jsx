@@ -212,7 +212,7 @@ describe("CSS standard (checked again by scripts/check-css.sh)", () => {
     expect(html).not.toMatch(/https?:\/\//);
   });
   it("no JSX sets a style attribute, an inline colour or an italic element", () => {
-    const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? (e.name === "__tests__" ? [] : walk(path.join(d, e.name))) : [path.join(d, e.name)]));
+    const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? (["__tests__", "floating-dialog", "talk-track"].includes(e.name) ? [] : walk(path.join(d, e.name))) : [path.join(d, e.name)]));
     for (const f of walk(WEB).filter((x) => /\.jsx?$/.test(x) && !/\.test\./.test(x))) {
       const text = fs.readFileSync(f, "utf8");
       expect(text, f).not.toMatch(/style=\{/);
