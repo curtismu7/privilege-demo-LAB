@@ -78,6 +78,11 @@ const prim = (v) => v === null || typeof v !== "object";
 // parent key with the URL as the value (one row, no nested "href" label).
 const hrefOnly = (v) => v && typeof v === "object" && !Array.isArray(v) && Object.keys(v).length === 1 && typeof v.href === "string";
 const nestedValue = (v) => !prim(v) && !hrefOnly(v) && !(Array.isArray(v) && v.every(prim));
+// From the third level down, a FLAT object (every entry is a scalar, a chip list or a link: a JSON-schema property, a tool annotation) sits beside its label
+// like any scalar row; only an object that nests further stacks under its label. That keeps a deep payload (tools/list) compact without narrowing the values.
+const FLAT_FROM_DEPTH = 2;
+const flatObject = (v) => !prim(v) && !Array.isArray(v) && Object.values(v).every((x) => !nestedValue(x));
+const stacked = (v, depth) => nestedValue(v) && !(depth >= FLAT_FROM_DEPTH && flatObject(v));
 const date = (n) => (Number.isFinite(n) && n > 1e9 && n < 1e11 ? `${new Date(n * 1000).toISOString().replace("T", " ").slice(0, 19)} UTC` : null);
 
 export function kindOf(v, key = "") {
@@ -185,7 +190,7 @@ function Form({ value, hot, k = "", depth = 0 }) {
     if (value.every(prim)) return <ChipList items={value} k={k} hot={hot} />;
     return (
       <ol className="jform__list">
-        {value.map((x, i) => <li key={i}><span className="jform__idx">{i + 1}</span><Form value={x} hot={hot} depth={depth + 1} /></li>)}
+        {value.map((x, i) => <li key={i} className="jform__item"><span className="jform__idx">{i + 1}</span><Form value={x} hot={hot} depth={depth + 1} /></li>)}
       </ol>
     );
   }
@@ -197,7 +202,7 @@ function Form({ value, hot, k = "", depth = 0 }) {
     return (
       <dl className="jform" data-depth={Math.min(depth, 3)}>
         {entries.map(([key, v]) => (
-          <div key={key} className="jform__row" data-hot={hot.has(key) ? "true" : undefined} data-alert={ALERT.has(key) ? "true" : undefined} data-nested={nestedValue(v) ? "true" : undefined}>
+          <div key={key} className="jform__row" data-hot={hot.has(key) ? "true" : undefined} data-alert={ALERT.has(key) ? "true" : undefined} data-nested={stacked(v, depth) ? "true" : undefined}>
             <dt className="jform__k">{visible(key)}</dt>
             <dd className="jform__d">{prim(v) ? <Value v={v} k={key} hot={hot} /> : <Form value={v} hot={hot} k={key} depth={depth + 1} />}</dd>
           </div>
