@@ -19,7 +19,7 @@ export default function HowItWorks() {
   return (
     <section className="howto card" aria-labelledby="howto-h" id="howto-body">
       <div className="howto__head">
-        <h2 id="howto-h">How this works</h2>
+        <h2 id="howto-h"><span className="step-num" data-n="1"></span>How this works</h2>
         <button type="button" aria-expanded="true" aria-controls="howto-body" onClick={() => set(true)}>Hide</button>
       </div>
       <ol className="howto__steps">
