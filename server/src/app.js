@@ -247,7 +247,11 @@ export function createApp({ cfg = config(), now = () => Date.now(), fetchImpl = 
     const caller = req.body?.caller && gatewayDoor.callers.some((c) => c.id === req.body.caller) ? req.body.caller : gatewayDoor.callers[0].id;
     const listing = await gatewayDoor.list(app, caller);
     const out = { app, caller, gateway: gatewayDoor.origin, ...(gatewayDoor.version ? { version: gatewayDoor.version } : {}), listing: stripWire(listing) };
-    const refusal = listing.ok ? await gatewayDoor.call(app, caller, 'privilege_demo_refusal_probe_tool', {}) : undefined;
+    // An aggregate door only accepts <server>__<tool> names, and answers an un-namespaced one with a name-format error that is not a
+    // policy refusal. So borrow the server prefix of a tool the door itself listed; a plain door keeps the bare name.
+    const listedNs = (listing.tools || []).map((t) => String(t?.name || '')).find((n) => /^[^_].*?__./.test(n));
+    const probeName = `${listedNs ? `${listedNs.slice(0, listedNs.indexOf('__'))}__` : ''}privilege_demo_refusal_probe_tool`;
+    const refusal = listing.ok ? await gatewayDoor.call(app, caller, probeName, {}) : undefined;
     if (refusal) out.refusal = stripWire(refusal);
     // "What Privilege did" (Rule 25): the exact exchanges, from the hop's redacted wire capture.
     out.exchanges = gatewayCheckExchanges(listing, refusal);

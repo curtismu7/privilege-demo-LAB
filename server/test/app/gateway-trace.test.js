@@ -165,6 +165,20 @@ describe('POST /api/gateway-check: a real trace from the shared hop capture', ()
     expect(list.request.headers.Authorization ?? list.request.headers.authorization).toMatch(/kept on the server/);
   });
 
+  it('an aggregate door (namespaced tools): the probe borrows the listed server prefix, so the gateway can refuse it by policy', async () => {
+    const called = [];
+    stubGateway((method, params, id) => {
+      if (method === 'tools/list') return { status: 200, body: { jsonrpc: '2.0', id, result: { tools: [{ name: 'travel-mcp__search_flights', description: 'Search' }] } } };
+      called.push(params.name);
+      return { status: 403, body: { error: 'forbidden', message: 'refused by policy' } };
+    });
+    const r = await check(mockApp());
+    expect(r.status).toBe(200);
+    expect(called).toEqual(['travel-mcp__privilege_demo_refusal_probe_tool']);
+    expect(r.body.refusal.ok).toBe(false);
+    expect(r.body.exchanges.map((e) => [e.step, e.status])).toEqual([[1, 200], [2, 403]]);
+  });
+
   it('a 401 on the handshake: the key check fails (inferred), the grant is not reached, and there is no probe', async () => {
     vi.stubGlobal('fetch', vi.fn(async (url, init = {}) => (init.method === 'DELETE' ? new Response(null, { status: 200 }) : new Response('{"error":"unauthorized"}', { status: 401, headers: { 'content-type': 'application/json' } }))));
     const r = await check(mockApp());
