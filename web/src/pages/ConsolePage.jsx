@@ -71,7 +71,7 @@ function Console() {
       <p role="status" className="muted">{filled}</p>
       <div className="cols">
         <section className="card" aria-labelledby="call-h">
-          <h2 id="call-h">Call a tool</h2>
+          <h2 id="call-h"><span className="step-num" data-n="3"></span>Call a tool</h2>
           <label className="field">Tool
             <select value={toolName} onChange={(e) => pickTool(e.target.value)}>
               {(tools.length ? tools.map((t) => t.name) : [toolName]).map((n) => <option key={n}>{n}</option>)}
@@ -89,7 +89,7 @@ function Console() {
         </section>
 
         <section className="card" aria-labelledby="tools-h">
-          <h2 id="tools-h">Tools the server offers</h2>
+          <h2 id="tools-h"><span className="step-num" data-n="4"></span>Tools the server offers</h2>
           <ul className="list">
             {tools.map((t) => (
               <li key={t.name} className="list-item list-item--static">

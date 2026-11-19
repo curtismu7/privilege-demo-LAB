@@ -10,7 +10,7 @@ export default function TryThis({ scenarios, me, mode, tools, onFill }) {
   if (mode !== "mock" || list.length === 0) return null;
   return (
     <section className="card try" aria-labelledby="try-h">
-      <h2 id="try-h">Try this</h2>
+      <h2 id="try-h"><span className="step-num" data-n="2"></span>Try this</h2>
       <p className="muted">Each button fills in the form below. It does not make the call.</p>
       <ul className="try__list">
         {list.map((s) => {

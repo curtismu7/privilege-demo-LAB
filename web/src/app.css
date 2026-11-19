@@ -42,6 +42,12 @@ a, a:visited { color: var(--status-info); }
 .lede { margin: 0 0 16px; }
 .muted { font-size: 13px; }
 .cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+/* Numbered step badge next to section headings (the page reads top to bottom). The number is drawn
+   with ::before from data-n so the heading's accessible name stays the section text alone. */
+.step-num { display: inline-grid; place-items: center; min-width: 22px; height: 22px; border-radius: 50%;
+  background: var(--accent-gradient); color: var(--on-accent); font: 700 12px var(--font-mono);
+  margin-right: 8px; vertical-align: 2px; }
+.step-num::before { content: attr(data-n); }
 .card { padding: 16px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); margin-bottom: 16px; min-width: 0; }
 code { padding: 1px 4px; margin-right: 4px; border-radius: 4px; background: var(--surface-2); border: 1px solid var(--border); font-size: 12px; overflow-wrap: anywhere; }
 pre, .editor { font-family: var(--font-mono); font-size: 12px; }
