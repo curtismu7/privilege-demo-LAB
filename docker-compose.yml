@@ -1,10 +1,12 @@
-# OrbStack:  docker compose up --build -d   ->  http://127.0.0.1:4510   (mock mode; nothing else to set up)
+# OrbStack:  docker compose up --build -d   ->  http://127.0.0.1:4510   (mock mode when PingFederate is not configured; nothing else to set up)
 # The port is published on 127.0.0.1 only (a test pins that). Do not widen it: mock sign-in has no password.
 #
 # Live mode (owner-run): to give the container your shared settings file (~/Development/.env, or the file STANDALONE_ENV names), add the overlay:
 #   docker compose -f docker-compose.yml -f docker-compose.shared-env.yml up --build -d
 # Live mode (owner-run) trusts the access tokens of your PingFederate. Put PF_URL and PF_AUDIENCE in your shell or in a local .env
-# next to this file, set DEMO_MODE=live (or press Live in the header), then `docker compose up --build -d`.
+# next to this file (or use the shared-env overlay), then `docker compose up --build -d`. Real is the default when configured
+# (rule 19): PF_URL + PF_AUDIENCE present and DEMO_MODE/PRIVILEGE_DEMO_MODE unset starts the app in live mode.
+# Pin mock with DEMO_MODE=mock in your shell/.env, or PRIVILEGE_DEMO_MODE=mock in the shared file.
 # To try the live path with no PingFederate, add the local stub issuer (NOT PingFederate):
 #   PF_URL=http://stub-issuer:9031 PF_HTTP_HOSTS=stub-issuer PF_AUDIENCE=privilege-demo docker compose --profile stub up --build -d
 #   docker compose exec -T stub-issuer node stub-issuer/mint.mjs priya
@@ -19,7 +21,7 @@ services:
       SHELF_URL: ${SHELF_URL:-http://127.0.0.1:4400}
       PORT: "4510"
       DATA_DIR: /data
-      DEMO_MODE: ${DEMO_MODE:-mock}
+      # No DEMO_MODE key: the app starts live when PF_URL + PF_AUDIENCE are configured (rule 19); pin with PRIVILEGE_DEMO_MODE in the shared file.
       # Mock sign-in (rule 11) is allowed here because the port above is published on 127.0.0.1 only; LAB_PUBLISH says so.
       ALLOW_MOCK_SIGNIN: "1"
       LAB_PUBLISH: loopback
@@ -30,6 +32,11 @@ services:
       PF_URL:
       PF_AUDIENCE:
       PF_HTTP_HOSTS:
+      # Passed through from your shell only when set (the live pi.flow sign-in client).
+      PF_AUTH_CLIENT_ID:
+      PF_AUTH_CLIENT_SECRET:
+      PF_AUTH_REDIRECT_URI:
+      PF_AUTH_SCOPE:
     volumes:
       - privilege-demo-data:/data
     networks: [demo]

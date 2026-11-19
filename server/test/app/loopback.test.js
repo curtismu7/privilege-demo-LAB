@@ -30,6 +30,11 @@ describe('loopback-only', () => {
     for (const p of ports) expect(p, p).toMatch(/^127\.0\.0\.1:/);
   });
 
+  it('compose does not force DEMO_MODE (rule 19: real is the default when configured; the shared file can pin it)', () => {
+    const compose = read('docker-compose.yml');
+    expect(compose).not.toMatch(/^\s*DEMO_MODE:/m);
+  });
+
   it('compose says the port is loopback-published (LAB_PUBLISH) wherever it allows mock sign-in, and the app is the only service with ports', () => {
     const compose = read('docker-compose.yml');
     expect(compose).toMatch(/ALLOW_MOCK_SIGNIN: "1"/);
