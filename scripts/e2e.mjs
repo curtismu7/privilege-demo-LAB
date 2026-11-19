@@ -81,7 +81,8 @@ try {
     // The raw facts (deciding policy, attribution, approvers) sit under "Technical details"; open them so this script can read them.
     const tech = card.locator('details.explain__tech > summary');
     if (await tech.count()) await tech.first().click();
-    const text = await card.innerText();
+    // The tool result is a JsonPane whose Form view collapses nested values; textContent still carries them, so read both.
+    const text = `${await card.innerText()}\n${await card.textContent()}`;
     const badge = await card.locator('.badge').first().textContent();
     const rule = await card.locator('dd code').first().innerText();
     return { card, text, badge, rule };
