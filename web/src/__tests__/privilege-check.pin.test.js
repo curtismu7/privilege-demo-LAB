@@ -8,7 +8,7 @@ import { createHash } from "node:crypto";
 
 const CANON = {
   "PrivilegeCheck.jsx": "0b022236251b56d1b96f853afeba1c0da96017c10eb591c622e80d071672b2a8",
-  "privilege-check.css": "0ffc43b8a9c2bd30194d121f0cdf147cb418b92e7edd504490487e3375802733",
+  "privilege-check.css": "14b630f8da9c7a70a21628843084ec743966a261cb2aee65ac5ed3c92f5b93a4",
   "PrivilegeCheck.test.jsx": "10fac709932a9d2435f28e5ebc907cf6e73e3d3b3cee5d1d2ec4bd2201a9b764",
   "README.md": "0ed063091a65535a44645dea768775569497a8c0b98046380b328152223949d5",
 };

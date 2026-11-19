@@ -91,10 +91,13 @@ button.danger { color: var(--danger-text); }
 .timeline__meta { color: var(--muted); }
 
 /* ---- sign-in ---- */
-.signin { max-width: 36rem; }
+.signin { max-width: none; }
 .persona-button { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; margin: 6px 0; text-align: left; }
 .guards { margin: 10px 0 0; padding: 0; list-style: none; font-size: 13px; }
 .guards li { margin: 4px 0; }
+.live-signin-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+.live-signin .inline { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; font-size: 13px; font-weight: 600; color: var(--muted); }
+.live-signin .inline input { min-height: 32px; }
 
 
 /* ---- explanations, rule chips, guided start (sizes in em so presenter mode, which raises the body size, grows them too) ---- */

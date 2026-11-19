@@ -93,29 +93,56 @@ export default function HomePage() {
 }
 
 
-// Live sign-in: a real PingFederate pi.flow login driven server-side. The username and password go to
-// PingFederate's Authentication API and are never stored; the returned token is verified against the PF JWKS
-// before the session is issued. Shown only when the server says the sign-in client is configured.
+// Live sign-in: a real PingFederate pi.flow login driven server-side, opened in a modal dialog from a
+// Sign in button. The username and password go to PingFederate's Authentication API and are never
+// stored; the returned token is verified against the PF JWKS before the session is issued. Shown only
+// when the server says the sign-in client is configured.
 function LiveSignInCard({ liveSignIn }) {
+  const [open, setOpen] = useState(false);
+  const close = () => setOpen(false);
+  return (
+    <section className="card" aria-labelledby="live-signin-h">
+      <h2 id="live-signin-h">Sign in with PingFederate</h2>
+      <p className="muted">Live mode: the sign-in runs through PingFederate's Authentication API (pi.flow, no redirect). The token is verified against the PingFederate JWKS before the session is issued; the password is never stored.</p>
+      <button type="button" className="primary" onClick={() => setOpen(true)}>Sign in</button>
+      {open && (
+        <div className="rn-backdrop" onClick={(e) => { if (e.target === e.currentTarget) close(); }}>
+          <LiveSignInDialog liveSignIn={liveSignIn} onClose={close} />
+        </div>
+      )}
+    </section>
+  );
+}
+
+function LiveSignInDialog({ liveSignIn, onClose }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState("");
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
   const submit = async (e) => {
     e.preventDefault();
     setBusy(true); setProblem("");
     const r = await liveSignIn(username, password);
     setBusy(false);
     if (!r.ok) setProblem(`Sign-in refused (${r.data?.reason ?? r.data?.error ?? r.status}).`);
+    else onClose();
   };
   return (
-    <section className="card" aria-labelledby="live-signin-h">
-      <h2 id="live-signin-h">Sign in with PingFederate</h2>
-      <p className="muted">Live mode: the sign-in runs through PingFederate's Authentication API (pi.flow, no redirect). The token is verified against the PingFederate JWKS before the session is issued; the password is never stored.</p>
-      <form onSubmit={submit} aria-label="Live sign-in">
-        <label className="inline" htmlFor="live-user">Username<input id="live-user" type="text" autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} maxLength={256} required /></label>
+    <section className="rn-dialog" role="dialog" aria-modal="true" aria-labelledby="live-signin-dialog-h">
+      <h2 id="live-signin-dialog-h">Sign in with PingFederate</h2>
+      <p className="muted">pi.flow: the credentials go to PingFederate's Authentication API; the password is never stored.</p>
+      <form className="live-signin" onSubmit={submit} aria-label="Live sign-in">
+        <label className="inline" htmlFor="live-user">Username<input id="live-user" type="text" autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} maxLength={256} required autoFocus /></label>
         <label className="inline" htmlFor="live-pass">Password<input id="live-pass" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} maxLength={1024} required /></label>
-        <button type="submit" className="primary" disabled={busy || !username || !password}>{busy ? "Signing in…" : "Sign in"}</button>
+        <div className="live-signin-actions">
+          <button type="button" onClick={onClose}>Cancel</button>
+          <button type="submit" className="primary" disabled={busy || !username || !password}>{busy ? "Signing in…" : "Sign in"}</button>
+        </div>
       </form>
       {problem && <p role="alert" className="problems">{problem}</p>}
     </section>
