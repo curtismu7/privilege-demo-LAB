@@ -12,6 +12,7 @@ import path from 'node:path';
 export const ALLOWED = new Set([
   'PRIVILEGE_DEMO_MODE', 'DEMO_MODE', 'PACK', 'DATA_DIR', 'APPROVAL_TTL_MS', 'SESSION_SECRET', 'SESSION_TTL_MS', 'CLOCK_SKEW_SEC',
   'PF_URL', 'PF_AUDIENCE', 'PF_ISSUER', 'PF_JWKS_URL', 'PF_HTTP_HOSTS',
+  'PF_AUTH_CLIENT_ID', 'PF_AUTH_CLIENT_SECRET', 'PF_AUTH_REDIRECT_URI', 'PF_AUTH_SCOPE', // live pi.flow sign-in client
 ]);
 // The real Privilege-gateway hop (gatewayReal.js): the door URL, door names and one agent access key per caller.
 for (const k of Object.keys(process.env)) if (k.startsWith('PDG_GW_')) ALLOWED.add(k);
