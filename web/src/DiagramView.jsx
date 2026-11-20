@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ReactFlow, Background, BaseEdge, Controls, getBezierPath, Handle, Position, MarkerType } from "@xyflow/react";
+import { ReactFlow, Background, Controls, Handle, Position, MarkerType } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import "./DiagramView.css";
+import { ArrowNoLabel, EdgeLabels, FitOpen, Passport, PassportActions } from "./diagram-kit/DiagramKit.jsx";
+import { boxPassport, inOutPoint } from "./diagram-kit/diagramKit.js";
+import "./diagram-kit/diagram-kit.css";
 import { loadDiagram, withPackWording } from "./diagrams/index.js";
 import { useStepper, SPEEDS } from "./stepper.js";
 
@@ -36,31 +39,15 @@ function BoxNode({ data }) {
       {data.sub.map((line, i) => <span key={`${i}-${line}`}>{line}</span>)}
       <Handle type="source" position={Position.Right} id="out" />
       <Handle type="target" position={Position.Right} id="back-in" className="handle-back" isConnectable={false} />
-      <Handle type="target" position={Position.Bottom} id="bottom-in" isConnectable={false} />
-      <Handle type="source" position={Position.Bottom} id="bottom-out" />
+      {data.passport && <Passport p={data.passport} />}
     </div>
   );
 }
 const nodeTypes = { box: BoxNode };
 
-// The default curve, with its label moved by data.labelShift so a request and its response between the same two boxes do not
-// print their labels on top of each other (along y for a sideways arrow, along x for one between stacked boxes).
-function Arrow({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data, ...rest }) {
-  const [path, labelX, labelY] = getBezierPath({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition });
-  const shift = data?.labelShift || 0;
-  return <BaseEdge path={path} labelX={labelX + (data?.vertical ? shift * 4 : 0)} labelY={labelY + (data?.vertical ? 0 : shift)} {...rest} />;
-}
-const edgeTypes = { arrow: Arrow };
-
-// Arrows that join the same two boxes, in either direction, are spread LABEL_GAP px apart; a lone arrow keeps 0.
-const LABEL_GAP = 24;
-export function labelShifts(edges) {
-  const groups = new Map();
-  edges.forEach((e, i) => { const k = [e.source, e.target].sort().join("\u0000"); (groups.get(k) || groups.set(k, []).get(k)).push(i); });
-  const shifts = edges.map(() => 0);
-  for (const ids of groups.values()) ids.forEach((i, k) => { shifts[i] = (k - (ids.length - 1) / 2) * LABEL_GAP; });
-  return shifts;
-}
+// The curve only: every label is drawn by the diagram kit's EdgeLabels, in a layer above the boxes,
+// placed so no two labels overlap and none sits on a box (the shared standard, UI patterns §8c).
+const edgeTypes = { arrow: ArrowNoLabel };
 
 const STACKED = 60; // boxes whose x differs by less than this are stacked in one column
 
@@ -73,7 +60,6 @@ export function toFlow(diagram, positions, activeEdges, simulating) {
     data: { label: n.label, sub: n.sub ?? [], color: diagram.groups[n.group]?.color ?? "grey" },
   }));
   const at = new Map(nodes.map((n) => [n.id, n.position]));
-  const shifts = labelShifts(diagram.edges);
   const edges = diagram.edges.map((e, i) => {
     const on = activeEdges.has(i);
     const from = at.get(e.source);
@@ -90,15 +76,31 @@ export function toFlow(diagram, positions, activeEdges, simulating) {
       source: e.source,
       target: e.target,
       ...handles,
-      label: e.label,
       animated: on,
       markerEnd: { type: MarkerType.ArrowClosed },
       className: `${on ? "edge-on" : simulating ? "edge-dim" : ""}${e.dashed ? " edge-dashed" : ""}`,
-      data: { labelShift: shifts[i], vertical },
+      data: { vertical },
     };
   });
   return { nodes, edges };
 }
+
+// One label item per arrow, for the kit's EdgeLabels layer (above the boxes, never overlapping).
+export function toLabelItems(diagram, edges, active) {
+  return diagram.edges.map((e, i) => ({
+    id: `e${i}`,
+    text: e.label ?? "",
+    source: e.source,
+    target: e.target,
+    sourceHandle: edges[i]?.sourceHandle,
+    targetHandle: edges[i]?.targetHandle,
+    active: active.has(i),
+    dim: active.size > 0 && !active.has(i),
+  }));
+}
+
+// Labels sit where the arrow meets the box: mid height on out/in, 70% down on the back pair (the kit's inOutPoint).
+export const labelPointFor = (box, handle) => inOutPoint(box, String(handle));
 
 export default function DiagramView({ id, wording = null, heading = "h3" }) {
   const diagram = useMemo(() => withPackWording(loadDiagram(id), wording), [id, wording]);
@@ -107,10 +109,23 @@ export default function DiagramView({ id, wording = null, heading = "h3" }) {
   useEffect(() => { dispatch({ type: "total", total: diagram.steps?.length ?? 0 }); }, [diagram, dispatch]);
 
   const flowRef = useRef(null);
-  const doReset = useCallback(() => resetDiagram({ reset, dispatch, instance: flowRef.current }), [reset, dispatch]);
+  const doReset = useCallback(() => { setOpen(null); resetDiagram({ reset, dispatch, instance: flowRef.current }); }, [reset, dispatch]);
   const step = s.step >= 0 ? diagram.steps[s.step] : null;
   const active = useMemo(() => new Set(step?.edges ?? []), [step]);
   const { nodes, edges } = useMemo(() => toFlow(diagram, positions, active, s.step >= 0), [diagram, positions, active, s.step]);
+  // Click a box and it expands in place with its details (the shared diagram kit's Passport, §8c).
+  const [open, setOpen] = useState(null);
+  const graph = useMemo(() => ({
+    nodes: diagram.nodes.map((n) => ({ id: n.id, label: n.label, sub: n.sub ?? [], group: n.group })),
+    edges: diagram.edges.map((e) => ({ source: e.source, target: e.target, label: e.label ?? "" })),
+    groups: diagram.groups,
+  }), [diagram]);
+  const passportFor = useMemo(() => (nid) => boxPassport(graph, nid), [graph]);
+  const withPassport = useMemo(
+    () => nodes.map((n) => ({ ...n, zIndex: n.id === open ? 10 : undefined, data: { ...n.data, passport: n.id === open ? passportFor(n.id) : null } })),
+    [nodes, open, passportFor]
+  );
+  const items = useMemo(() => toLabelItems(diagram, edges, active), [diagram, edges, active]);
   const onNodesChange = useCallback((changes) => {
     for (const change of changes) if (change.type === "position" && change.position) move(change.id, change.position);
   }, [move]);
@@ -136,22 +151,28 @@ export default function DiagramView({ id, wording = null, heading = "h3" }) {
         </label>
       </div>
       <div className="diagram__canvas" data-testid="diagram-canvas">
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          nodeTypes={nodeTypes}
-          edgeTypes={edgeTypes}
-          onNodesChange={onNodesChange}
-          nodesDraggable
-          nodesConnectable={false}
-          onInit={(instance) => { flowRef.current = instance; }}
-          fitView
-          proOptions={{ hideAttribution: true }}
-          minZoom={0.2}
-        >
-          <Background />
-          <Controls showInteractive={false} />
-        </ReactFlow>
+        <PassportActions.Provider value={{ open: setOpen, close: () => setOpen(null), link: (nid) => { const u = new URL(window.location.href); u.searchParams.set("box", nid); return u.toString(); } }}>
+          <ReactFlow
+            nodes={withPassport}
+            edges={edges}
+            nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
+            onNodesChange={onNodesChange}
+            onNodeClick={(_, n) => setOpen((o) => (o === n.id ? null : n.id))}
+            onPaneClick={() => setOpen(null)}
+            nodesDraggable
+            nodesConnectable={false}
+            onInit={(instance) => { flowRef.current = instance; }}
+            fitView
+            proOptions={{ hideAttribution: true }}
+            minZoom={0.2}
+          >
+            <Background />
+            <Controls showInteractive={false} />
+            <EdgeLabels items={items} pointFor={labelPointFor} fallback={{ w: 240, h: 110 }} />
+            <FitOpen open={open} closePadding={0.08} />
+          </ReactFlow>
+        </PassportActions.Provider>
       </div>
       <p className="diagram__now" role="status" data-testid="step-text">
         {step ? <><strong>Step {s.step + 1} of {diagram.steps.length}: {step.title}.</strong> {step.what}</> : "Press Simulate, or Next to step through. Drag the boxes to rearrange them."}
