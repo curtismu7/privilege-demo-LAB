@@ -18,7 +18,7 @@ services:
     ports:
       - "127.0.0.1:${HOST_PORT:-4510}:4510"
     environment:
-      SHELF_URL: ${SHELF_URL:-http://127.0.0.1:4400}
+      SHELF_URL: ${SHELF_URL:-https://local.ping-devops.com:8443/demo-shelf}
       PORT: "4510"
       DATA_DIR: /data
       # No DEMO_MODE key: the app starts live when PF_URL + PF_AUDIENCE are configured (rule 19); pin with PRIVILEGE_DEMO_MODE in the shared file.
