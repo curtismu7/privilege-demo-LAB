@@ -60,7 +60,7 @@ function Approvals() {
                   <Explanation explanation={a.outcome?.explanation ?? a.explanation} />
                 </details>
               )}
-              {a.outcome?.result && <Json value={a.outcome.result} label="Tool result" hot={["status", "amount", "env", "merged", "deployed"]} />}
+              {a.outcome?.result && <Json value={a.outcome.result} label="Tool result" hot={["status", "amount", "merged", "deployed"]} />}
               {mayDecide(a) ? (
                 <>
                 <p className="muted">If you approve, the rules are checked again with one approval recorded and the tool runs once.</p>

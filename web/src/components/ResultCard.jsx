@@ -36,7 +36,7 @@ export default function ResultCard({ title, res, children }) {
           {res.problems.map((p, i) => <li key={i}>{typeof p === "string" ? p : p.message}</li>)}
         </ul>
       )}
-      {res.result && <Json value={res.result} label="Tool result" hot={["status", "amount", "env", "merged", "deployed"]} />}
+      {res.result && <Json value={res.result} label="Tool result" hot={["status", "amount", "merged", "deployed"]} />}
       {children}
     </section>
   );
