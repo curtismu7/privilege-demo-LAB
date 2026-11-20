@@ -177,3 +177,12 @@ button.danger { color: var(--danger-text); }
 
 /* ---- approvals: an inline text button (let a pending request expire now) ---- */
 .linkish { background: none; border: none; padding: 0; color: var(--accent); font: inherit; text-decoration: underline; cursor: pointer; }
+
+/* An expanded box (diagram kit §8c): give it a width the details can be read at. */
+.react-flow__node.dk-open {
+  width: 320px;
+}
+.react-flow__node.dk-open .dg-node {
+  max-height: 420px;
+  overflow-y: auto;
+}
