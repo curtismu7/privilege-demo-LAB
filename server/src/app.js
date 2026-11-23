@@ -98,7 +98,7 @@ export function createApp({ cfg = config(), now = () => Date.now(), fetchImpl = 
       const backend = createBackend({ tools: pack.tools });
       const explanations = createExplanationStore({ size: 500 });
       const store = createPolicyStore({ dataDir: dir, pack });
-      const runs = createRunLog({ now, write: log, mode });
+      const runs = createRunLog({ now, write: log, mode, scope: id });
       const approvals = createApprovals({
         now, ttlMs: cfg.approvalTtlMs,
         onExpire(r) {
@@ -256,14 +256,15 @@ export function createApp({ cfg = config(), now = () => Date.now(), fetchImpl = 
     const caller = req.body?.caller && gatewayDoor.callers.some((c) => c.id === req.body.caller) ? req.body.caller : gatewayDoor.callers[0].id;
     const startedAt = now();
     const listing = await gatewayDoor.list(app, caller);
-    const listedAt = now(); // when the lab had this reply (stamped once)
+    const listedAt = startedAt + listing.ms; // when the reply came back: ms is measured before the hop closes its session (which can wait out its own time cap)
     const out = { app, caller, gateway: gatewayDoor.origin, ...(gatewayDoor.version ? { version: gatewayDoor.version } : {}), listing: stripWire(listing) };
     // An aggregate door only accepts <server>__<tool> names, and answers an un-namespaced one with a name-format error that is not a
     // policy refusal. So borrow the server prefix of a tool the door itself listed; a plain door keeps the bare name.
     const listedNs = (listing.tools || []).map((t) => String(t?.name || '')).find((n) => /^[^_].*?__./.test(n));
     const probeName = `${listedNs ? `${listedNs.slice(0, listedNs.indexOf('__'))}__` : ''}privilege_demo_refusal_probe_tool`;
+    const probeStart = Math.max(now(), listedAt); // the probe cannot start before the listing's reply (the two differ only when the lab's clock stands still)
     const refusal = listing.ok ? await gatewayDoor.call(app, caller, probeName, {}) : undefined;
-    const probedAt = now();
+    const probedAt = refusal ? probeStart + refusal.ms : undefined;
     if (refusal) out.refusal = stripWire(refusal);
     // "What Privilege did" (Rule 25): the exact exchanges, from the hop's redacted wire capture.
     out.exchanges = gatewayCheckExchanges(listing, refusal);
@@ -368,7 +369,7 @@ export function createApp({ cfg = config(), now = () => Date.now(), fetchImpl = 
     const ws = wsOf(req);
     const out = ws.pep.enforce({ claims, tool, args: args ?? {}, source: req.principal.source, traceparent: req.principal.traceparent, justification });
     // Rule 27: the run of this call (its decisions are stamped, written and stored once). A recorder that fails never changes the answer.
-    const runId = ws.runs.tool({ claims, source: req.principal.source, viaFlag: asAgent === true, tool, out });
+    const runId = ws.runs.tool({ claims, source: req.principal.source, persona: req.principal.persona, viaFlag: asAgent === true, tool, out });
     res.set('traceparent', out.traceparent);
     // ?envelope=1 (the web console): always 200 with the outcome in the body, because a Deny is a result and not a failed request.
     // The console also gets "What Privilege did" (Rule 25): this exchange as the simulated gateway handled it, beside the outcome it shows.
@@ -548,7 +549,8 @@ export function createApp({ cfg = config(), now = () => Date.now(), fetchImpl = 
   app.get('/api/run-observability', authed({}, async (req, res) => {
     const { runs, approvals } = wsOf(req);
     const wanted = typeof req.query.runId === 'string' ? req.query.runId.slice(0, 80) : undefined;
-    const found = runs.find(wanted, mode());
+    const viewer = { sub: req.principal.claims.sub, admin: isAdmin(req.principal.claims) };
+    const found = runs.find(wanted, mode(), viewer);
     if (!found.run) {
       const message = found.none === 'other-mode' ? `That run was made in ${MODE_NAME[found.runMode]} mode. Switch back to ${MODE_NAME[found.runMode]} to see it.`
         : found.none === 'unknown' ? 'That run is no longer kept: a workspace keeps its newest runs, and Reset clears them.'
@@ -557,7 +559,7 @@ export function createApp({ cfg = config(), now = () => Date.now(), fetchImpl = 
     }
     try {
       if (found.run.open) approvals.list(); // the queue expires lazily: look at it, so a request past its time is closed before its record is read
-      return res.json({ record: await runs.record(found.run), run: { id: found.run.id, open: found.run.open, mode: found.run.mode } });
+      return res.json({ record: await runs.record(found.run, { redact: found.redact }), run: { id: found.run.id, open: found.run.open, mode: found.run.mode } });
     } catch (e) {
       console.error(`[privilege-demo] run record failed (${e?.code || e?.name || 'error'})`);
       return res.status(e instanceof RunObsError ? e.status : 500).json({ error: e?.code || 'run_record_failed', message: e instanceof RunObsError ? e.message : 'The run record could not be built.' });

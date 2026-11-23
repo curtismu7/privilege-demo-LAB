@@ -8,14 +8,15 @@ import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mockApp, pfApp, startStubPf, signedIn, tmpDir, bearer, rpc } from './helpers.js';
 import { assertRunObservability, classify, layerMatchers } from '../../src/runObservability.js';
-import { MAX_RUNS, createRunLog, lineValue, replyOutcome, rowOf } from '../../src/runLog.js';
+import { MAX_RUNS, SIGN_IN_CAUSES, createRunLog, lineValue, replyOutcome, rowOf } from '../../src/runLog.js';
+import { createSessions, cookieName } from '../../src/auth/session.js';
 import { checkPin } from '../../../scripts/run-observability-checkPin.mjs';
 
 // Rule 27 for this lab: the stdout line per decision, one run per record, the mode stored on the run, and the honesty of every row.
 // Every test points STANDALONE_ENV at a file that does not exist (or a throwaway one): the owner's ~/Development/.env is never read.
 const root = path.resolve(fileURLToPath(new URL('../../../', import.meta.url)));
 const read = (f) => fs.readFileSync(path.join(root, f), 'utf8');
-const LINE = /^\d{4}-\d\d-\d\dT[\d:.]+Z privilege-demo-lab decision layer=[a-z]+ step=[a-z-]+ actor=\S+ agent=\S+ tool=\S+ result=(?:passed|stopped|unclear|no-reply) mode=(?:mock|live|real) run=\S+$/;
+const LINE = /^\d{4}-\d\d-\d\dT[\d:.]+Z privilege-demo-lab decision layer=[a-z]+ step=[a-z-]+ actor=\S+ agent=\S+ act-source=(?:lab|credential|-) tool=\S+ result=(?:passed|stopped|unclear|no-reply) mode=(?:mock|live|real) cause=[a-z-]+ count=\d+ run=\S+$/;
 const WORDS = /refused|denied|rejected|forbidden|failed|invalid|expired|mismatch|token|audience|scope|served/i;
 const PRODUCTS = [...new Set(layerMatchers.map((m) => m.product))];
 
@@ -94,7 +95,7 @@ describe('Mock: a tool call is one run, every row is a decision the lab computed
     const mark = await signedIn(ctx, 'mark');
     const r = await call(mark, { tool: 'book_fare', args: fare(500), asAgent: true });
     expect(r.body.outcome).toBe('allow');
-    expect(r.body.runId).toMatch(/^run-[0-9a-f]{6}-\d+$/);
+    expect(r.body.runId).toMatch(/^run-default-[0-9a-f]{6}-\d+$/);
     const body = await recordOf(mark, r.body.runId);
     expect(body.run).toEqual({ id: r.body.runId, open: false, mode: 'mock' });
     const rec = body.record;
@@ -149,7 +150,7 @@ describe('Mock: a tool call is one run, every row is a decision the lab computed
     expect(only(b, 'privilege').message).toMatch(/invalid-arguments/);
     const text = ctx.lines.join('\n');
     expect(text).not.toMatch(/script|mallory|evil|10\.1\.2\.3|result=passed run=evil/);
-    expect(ctx.lines.filter((l) => /step=policy actor=mary agent=- tool=- result=stopped/.test(l))).toHaveLength(1); // the unknown name has no tool=
+    expect(ctx.lines.filter((l) => /step=policy actor=mary agent=- act-source=- tool=- result=stopped/.test(l))).toHaveLength(1); // the unknown name has no tool=
   });
 
   it('fail-closed (the engine could not evaluate) is the lab\'s own stop: blocked; a Cedar deny stays refused', () => {
@@ -165,7 +166,7 @@ describe('Mock: a tool call is one run, every row is a decision the lab computed
     expect(outcomes).toEqual({ error: 'blocked', 'invalid-claims': 'blocked', 'invalid-request': 'blocked', 'default-deny': 'refused', 's23-forbid-over-cap': 'refused', 'unknown-tool': 'refused', 'invalid-arguments': 'refused' });
   });
 
-  it('a Bearer credential through /mcp: the sign-in check is an allowed decision of the lab\'s mock verifier; the run is the newest of this workspace', async () => {
+  it('a Bearer credential through /mcp: the credential check is information (authentication); the run is the newest of the person\'s runs', async () => {
     const ctx = make();
     const mark = await signedIn(ctx, 'mark');
     const token = (await mark.post('/api/mock/token').send({ asAgent: true })).body.access_token;
@@ -173,7 +174,7 @@ describe('Mock: a tool call is one run, every row is a decision the lab computed
     expect(done.status).toBe(200);
     const rec = (await recordOf(mark)).record; // no runId: the newest run in this mode
     clean(rec);
-    expect(only(rec, 'person')).toMatchObject({ outcome: 'allowed', product: 'lab mock issuer check' });
+    expect(only(rec, 'person')).toMatchObject({ outcome: 'info', product: 'lab mock issuer check' }); // authentication, not a policy decision
     expect(only(rec, 'person').message).toMatch(/accepted it: the call is for mark\./);
     expect(only(rec, 'agent').message).toMatch(/mock credential carries act\.sub=dot/);
   });
@@ -186,7 +187,7 @@ describe('Mock: a tool call is one run, every row is a decision the lab computed
     expect(await recordOf(mark)).toMatchObject({ record: null, reason: 'no-run' });
     expect(ctx.lines).toHaveLength(1);
     expect(ctx.lines[0]).toMatch(LINE);
-    expect(ctx.lines[0]).toMatch(/layer=person step=sign-in actor=- agent=- tool=- result=stopped mode=mock run=-$/);
+    expect(ctx.lines[0]).toMatch(/layer=person step=sign-in actor=- agent=- act-source=- tool=- result=stopped mode=mock cause=unreadable count=1 run=-$/);
     // a refused sign-in on tools/list is not a tool call: no line
     await rpc(request(ctx.app), 'not-a-token', 'tools/list', {});
     expect(ctx.lines).toHaveLength(1);
@@ -349,7 +350,7 @@ describe('the mode is stored on the run and a run comes back only in its own mod
       expect(Object.values(liveBody.record.coverage)).toEqual(Array(6).fill('not-logged'));
       expect(liveBody.record.reasons.agent).toMatch(/UNVERIFIED/);
       expect(liveBody.record.reasons.privilege).toMatch(/lab computation, neither a log line nor a reply/);
-      expect(lines.at(-1)).toMatch(/layer=resource step=tool-run actor=priya .* mode=live run=run-/); // the lab still writes its own line in Live
+      expect(lines.at(-1)).toMatch(/layer=resource step=tool-run actor=priya .* mode=live cause=- count=1 run=run-/); // the lab still writes its own line in Live
       // Mock: the Live run is not returned
       expect((await http.put('/api/mode').send({ mode: 'mock' })).body.mode).toBe('mock');
       const mark = request.agent(ctx.app);
@@ -385,7 +386,7 @@ describe('the stdout line: one per decision, the row\'s own time, no word a shar
       expect(l).not.toMatch(WORDS);
     });
     expect(ctx.lines.map((l) => /layer=(\w+) step=([a-z-]+)/.exec(l).slice(1).join(':'))).toEqual(['person:sign-in', 'agent:agent', 'privilege:policy', 'resource:tool-run']);
-    expect(ctx.lines[2]).toMatch(/actor=mark agent=dot tool=book_fare result=passed mode=mock/);
+    expect(ctx.lines[2]).toMatch(/actor=mark agent=dot act-source=lab tool=book_fare result=passed mode=mock cause=- count=1/);
     expect(ctx.lines[0]).toMatch(/result=unclear/);
   });
 
@@ -408,7 +409,7 @@ describe('the stdout line: one per decision, the row\'s own time, no word a shar
     for (const line of lines) {
       expect(line).toMatch(LINE);
       expect(line.split('\n')).toHaveLength(1);
-      expect(line.match(/ \w+=/g).length).toBe(8); // layer step actor agent tool result mode run: nothing was added
+      expect(line.match(/ [\w-]+=/g).length).toBe(11); // layer step actor agent act-source tool result mode cause count run: nothing was added
       const at = line.split(' ')[0];
       const body = line.slice(at.length + 1);
       for (const product of PRODUCTS) {
@@ -418,7 +419,7 @@ describe('the stdout line: one per decision, the row\'s own time, no word a shar
       }
     }
     // the words a matcher reads are never the lab's own: only the typed values may carry them, and only after masking and sanitising
-    const own = lines.map((l) => l.replace(/actor=\S+ agent=\S+ tool=\S+/, ''));
+    const own = lines.map((l) => l.replace(/actor=\S+ agent=\S+ act-source=\S+ tool=\S+/, ''));
     for (const l of own) expect(l).not.toMatch(WORDS);
   });
 
@@ -520,8 +521,9 @@ const door = () => {
   process.env.STANDALONE_ENV = file;
 };
 // onCall(method, params, id) -> { status, body } | 'drop' (the connection fails: no reply)
-const stubGateway = (onCall) => vi.stubGlobal('fetch', vi.fn(async (url, init = {}) => {
-  if (init.method === 'DELETE') return new Response(null, { status: 200 });
+const stubGateway = (onCall, { hangClose = false } = {}) => vi.stubGlobal('fetch', vi.fn(async (url, init = {}) => {
+  // hangClose: the door answers every call at once but never answers the session close (the hop gives up after its own time cap)
+  if (init.method === 'DELETE') return hangClose ? new Promise((_, no) => init.signal?.addEventListener('abort', () => no(new DOMException('aborted', 'AbortError')))) : new Response(null, { status: 200 });
   const msg = JSON.parse(init.body);
   const json = (status, body, headers = {}) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', ...headers } });
   if (msg.method === 'initialize') return json(200, { jsonrpc: '2.0', id: msg.id, result: { protocolVersion: '2025-06-18', serverInfo: { name: 'stub-door', version: '1' }, capabilities: {} } }, { 'mcp-session-id': SESSION });
@@ -663,6 +665,213 @@ describe('rows and outcomes', () => {
 
   it('rowOf refuses a fact it does not know', () => {
     expect(() => rowOf({ kind: 'invented' })).toThrow();
+  });
+});
+
+describe('review fixes: authentication is information, honest times, honest wording, who may read a held run', () => {
+  it('1. the same permitted call scores the same by cookie and by Bearer: a credential check is authentication, never an allowed decision', async () => {
+    const ctx = make();
+    const mark = await signedIn(ctx, 'mark');
+    const byCookie = await call(mark, { tool: 'book_fare', args: fare(500), asAgent: true });
+    const token = (await mark.post('/api/mock/token').send({ asAgent: true })).body.access_token;
+    expect((await rpc(request(ctx.app), token, 'tools/call', { name: 'book_fare', arguments: fare(500) })).status).toBe(200);
+    const a = (await recordOf(mark, byCookie.body.runId)).record;
+    const b = (await recordOf(mark)).record; // the newest of Mark's runs: the Bearer one
+    expect(b.runId).not.toBe(a.runId);
+    expect(a.summary).toMatchObject({ allowed: 1, refused: 0, blocked: 0, info: 3 });
+    expect(b.summary).toEqual(a.summary);
+    expect(only(b, 'person').outcome).toBe('info');
+  });
+
+  it('2. a door that never answers the session close: the rows are stamped when the replies came back, not seconds later', async () => {
+    door();
+    stubGateway((method, params, id) => (method === 'tools/list' ? tools(id) : { status: 403, body: {} }), { hangClose: true });
+    const lines = [];
+    const ctx = mockApp({}, { log: (l) => lines.push(l), now: Date.now }); // the real clock: the bug only shows when time passes
+    const t0 = Date.now();
+    const { r } = await check(ctx);
+    const end = Date.now();
+    expect(r.status).toBe(200);
+    expect(end - t0).toBeGreaterThan(5500); // the check really did wait for both session closes (3 s each)
+    const rec = r.body.observability;
+    clean(rec);
+    const [list, probe] = gw(rec);
+    expect(gw(rec)).toHaveLength(2);
+    expect(Date.parse(list.at) - t0).toBeLessThan(1500); // the listing was answered at once: not stamped after its close
+    expect(end - Date.parse(probe.at)).toBeGreaterThan(2500); // and the probe's reply is not stamped after the probe's own close either
+    expect(Date.parse(probe.at)).toBeGreaterThanOrEqual(Date.parse(list.at));
+    lines.forEach((l, i) => expect(l.split(' ')[0]).toBe(gw(rec)[i].at));
+  }, 30_000);
+
+  it('3. a live sign-in cookie used in Mock mode is not called a mock persona, and its act is not called a mock credential', async () => {
+    const secret = 'test-secret-for-a-crafted-cookie';
+    const ctx = make({ sessionSecret: secret });
+    const sessions = createSessions({ secret, ttlMs: 3_600_000, now: () => ctx.clock.t });
+    const live = { sub: 'pat', groups: ['travel-agents'], scope: 'tools:invoke', client_id: 'pat-web', act: { sub: 'robo' } };
+    const cookie = `${cookieName('default')}=${sessions.issueClaims(live, 'default')}`;
+    const r = await request(ctx.app).post('/api/tools/call?envelope=1').set('Cookie', cookie).send({ tool: 'book_fare', args: fare(500) });
+    expect(r.status).toBe(200);
+    const rec = (await request(ctx.app).get(`/api/run-observability?runId=${r.body.runId}`).set('Cookie', cookie)).body.record;
+    clean(rec);
+    expect(only(rec, 'person').message).not.toMatch(/persona was picked|mock sign-in page/);
+    expect(only(rec, 'person').message).toMatch(/signed session cookie made at a live sign-in/);
+    expect(only(rec, 'person').product).toBe('lab session cookie');
+    expect(only(rec, 'agent').message).not.toMatch(/mock credential/);
+    expect(only(rec, 'agent').message).toMatch(/session's claims carry act\.sub=robo/);
+    expect(ctx.lines.filter((l) => /layer=agent/.test(l))[0]).toMatch(/act-source=credential/);
+  });
+
+  describe('4. a held run is read by its participants; anyone else gets it without the people', () => {
+    it('a non-participant sees the same rows without the person, the agent or the approver; participants and admins see it whole', async () => {
+      const ctx = make();
+      const mark = await signedIn(ctx, 'mark');
+      const priya = await signedIn(ctx, 'priya');
+      const mary = await signedIn(ctx, 'mary');
+      const dana = await signedIn(ctx, 'dana');
+      const h = (await call(mark, { tool: 'book_fare', args: fare(2400), asAgent: true })).body;
+      const full = (await recordOf(mark, h.runId)).record;
+      const text = (rec) => JSON.stringify(rec.rows.map((x) => [x.layer, x.outcome, x.message]));
+      for (const who of [priya, dana]) expect(text((await recordOf(who, h.runId)).record)).toBe(text(full));
+      expect(text(full)).toMatch(/mark|priya|dot/);
+      const other = (await recordOf(mary, h.runId)).record;
+      clean(other);
+      expect(text(other)).not.toMatch(/mark|priya|dot/);
+      expect(other.rows.map((x) => [x.layer, x.outcome, x.origin])).toEqual(full.rows.map((x) => [x.layer, x.outcome, x.origin])); // everything else is kept
+      expect(other.rows.find((x) => x.layer === 'privilege').message).toMatch(/Waiting for an approver/);
+      expect(ctx.lines.join('\n')).toMatch(/actor=mark/); // the stdout line is the operator's own log, not this answer
+      // after the approver answers, the same holds for the answer row
+      await priya.post(`/api/approvals/${h.approvalId}/approve`);
+      expect(text((await recordOf(mary, h.runId)).record)).not.toMatch(/mark|priya|dot/);
+      expect(text((await recordOf(mark, h.runId)).record)).toMatch(/priya approved the held call/);
+    });
+
+    it('a run that was never held is as open as /api/trace; and with no run id nobody gets another person\'s run (an admin gets the newest of all)', async () => {
+      const ctx = make();
+      const mark = await signedIn(ctx, 'mark');
+      const mary = await signedIn(ctx, 'mary');
+      const dana = await signedIn(ctx, 'dana');
+      const m = (await call(mark, { tool: 'book_fare', args: fare(500) })).body;
+      expect(JSON.stringify((await recordOf(mary, m.runId)).record.rows)).toMatch(/mark/); // parity with /api/trace, which names the subject to everyone
+      expect(await recordOf(mary)).toMatchObject({ record: null, reason: 'no-run' });
+      expect((await recordOf(dana)).record.runId).toBe(m.runId);
+      const own = (await call(mary, { tool: 'search_flights', args: { query: 'x' } })).body;
+      expect((await recordOf(mary)).record.runId).toBe(own.runId);
+      expect((await recordOf(mark)).record.runId).toBe(m.runId);
+    });
+  });
+
+  it('6. the line says whether the act was added by the lab or carried by the credential; nobody else is named', async () => {
+    const lines = [];
+    const log = createRunLog({ now: () => Date.UTC(2026, 10, 22, 10, 0, 0), write: (l) => lines.push(l), mode: () => 'live' });
+    const out = { outcome: 'allow', rule: 'r', reason: 'x', rules: [] };
+    log.tool({ claims: { sub: 'pat', act: { sub: 'robo' } }, source: 'bearer', viaFlag: true, tool: 'book_fare', out });
+    log.tool({ claims: { sub: 'pat', act: { sub: 'robo' } }, source: 'bearer', viaFlag: false, tool: 'book_fare', out });
+    log.tool({ claims: { sub: 'pat' }, source: 'bearer', tool: 'book_fare', out });
+    const flags = lines.map((l) => `${/layer=(\w+)/.exec(l)[1]}:${/act-source=(\S+)/.exec(l)[1]}`);
+    expect(flags).toEqual(['person:lab', 'agent:lab', 'privilege:lab', 'resource:lab', 'person:credential', 'agent:credential', 'privilege:credential', 'resource:credential', 'person:-', 'privilege:-', 'resource:-']);
+    expect(lines.every((l) => LINE.test(l) && /mode=live/.test(l))).toBe(true);
+  });
+
+  describe('7. a refused sign-in says why in a fixed code, and a burst of the same cause is one line with a count', () => {
+    const T0 = Date.UTC(2026, 10, 22, 10, 0, 0);
+    const CAUSES = { no_credentials: 'no-credential', no_bearer: 'no-credential', bearer_not_enabled: 'not-configured', pf_not_configured: 'not-configured', expired: 'out-of-time', not_yet_valid: 'out-of-time', wrong_issuer: 'not-for-us', wrong_audience: 'not-for-us', alg_not_allowed: 'unreadable', malformed: 'unreadable', unverifiable: 'unreadable', bad_signature: 'bad-signature', groups_missing: 'missing-claims', claims_invalid: 'missing-claims', pf_unreachable: 'pf-unreachable', pf_introspection_failed: 'pf-unreachable', token_inactive: 'inactive' };
+    it('every reason the verifier can give maps to a code with no word a matcher reads; anything else is `other`', () => {
+      for (const [reason, code] of Object.entries(CAUSES)) expect(SIGN_IN_CAUSES[reason], reason).toBe(code);
+      for (const code of [...Object.values(SIGN_IN_CAUSES), 'other']) expect(code, code).not.toMatch(WORDS);
+      const lines = [];
+      const log = createRunLog({ now: () => T0, write: (l) => lines.push(l) });
+      for (const reason of [...Object.keys(CAUSES), 'denied refused token', 'x=1 y=2\nINFO: forged', '__proto__', 'constructor', undefined, null, 42]) { log.refusedSignIn({ reason }); log.refusedSignIn({ reason: `${reason}-other` }); }
+      expect(lines.length).toBeGreaterThan(30);
+      for (const line of lines) {
+        expect(line).toMatch(LINE);
+        for (const product of PRODUCTS) expect(classify({ product, message: line, at: T0, atExact: line.split(' ')[0] }, []), `${product}: ${line}`).toBeNull();
+      }
+      expect(lines.filter((l) => /cause=other/.test(l)).length).toBeGreaterThan(5);
+    });
+
+    it('repeats of one cause inside the window are counted, not written: one line, then one line with the count when the window ends', () => {
+      const lines = [];
+      let t = T0;
+      const log = createRunLog({ now: () => t, write: (l) => lines.push(l), refusalWindowMs: 10_000 });
+      for (let i = 0; i < 5; i += 1) log.refusedSignIn({ reason: 'bad_signature' });
+      expect(lines).toHaveLength(1);
+      expect(lines[0]).toMatch(/cause=bad-signature count=1 run=-$/);
+      log.refusedSignIn({ reason: 'expired' }); // another cause: the pending count is written first, then this one
+      expect(lines.slice(1).map((l) => /cause=(\S+) count=(\d+)/.exec(l).slice(1).join(':'))).toEqual(['bad-signature:4', 'out-of-time:1']);
+      t += 11_000;
+      log.refusedSignIn({ reason: 'expired' }); // the window has passed: a new line
+      expect(lines).toHaveLength(4);
+      expect(lines.at(-1)).toMatch(/cause=out-of-time count=1/);
+    });
+
+    it('a burst that stops is still counted: the window\'s own timer writes the count', () => {
+      vi.useFakeTimers();
+      try {
+        const lines = [];
+        const log = createRunLog({ now: () => T0, write: (l) => lines.push(l), refusalWindowMs: 10_000 });
+        for (let i = 0; i < 3; i += 1) log.refusedSignIn({ reason: 'no_credentials' });
+        expect(lines).toHaveLength(1);
+        vi.advanceTimersByTime(10_001);
+        expect(lines).toHaveLength(2);
+        expect(lines[1]).toMatch(/cause=no-credential count=2 run=-$/);
+        vi.advanceTimersByTime(60_000);
+        expect(lines).toHaveLength(2); // nothing more to say
+      } finally { vi.useRealTimers(); }
+    });
+
+    it('over HTTP: five unauthenticated calls make one line, with the cause in it', async () => {
+      const ctx = make();
+      for (let i = 0; i < 5; i += 1) await request(ctx.app).post('/api/tools/call').send({ tool: 'search_flights', args: { query: 'x' } });
+      expect(ctx.lines).toHaveLength(1);
+      expect(ctx.lines[0]).toMatch(/cause=no-credential count=1 run=-$/);
+    });
+  });
+
+  it('8. the cap is per mode: twenty-five Live runs never push a Mock run out, and an open run is never evicted', () => {
+    let mode = 'mock';
+    const log = createRunLog({ now: () => Date.UTC(2026, 10, 22, 10, 0, 0), write: () => {}, mode: () => mode });
+    const out = { outcome: 'allow', rule: 'r', reason: 'x', rules: [] };
+    const claims = { sub: 'mark' };
+    const mockIds = [1, 2, 3].map(() => log.tool({ claims, source: 'session', tool: 'book_fare', out }));
+    mode = 'live';
+    const held = log.tool({ claims, source: 'bearer', tool: 'book_fare', out: { outcome: 'hold', rule: 's', reason: 'x', approvers: ['priya'], approvalId: 'ap-live', rules: [] } });
+    const liveIds = Array.from({ length: MAX_RUNS + 5 }, () => log.tool({ claims, source: 'bearer', tool: 'book_fare', out }));
+    for (const id of mockIds) expect(log.find(id, 'mock').run?.id, id).toBe(id);
+    expect(log.find(held, 'live').run?.open).toBe(true);
+    expect(log.find(liveIds[0], 'live')).toEqual({ none: 'unknown' });
+    expect(log.find(liveIds.at(-1), 'live').run.id).toBe(liveIds.at(-1));
+    expect(log.count('live')).toBe(MAX_RUNS);
+    expect(log.count('mock')).toBe(3);
+  });
+
+  it('11. run ids differ across workspaces by construction, not by luck; the README says what is true about PingFederate\'s logs', async () => {
+    const mk = (scope) => createRunLog({ now: () => Date.UTC(2026, 10, 22, 10, 0, 0), write: () => {}, scope });
+    const out = { outcome: 'allow', rule: 'r', reason: 'x', rules: [] };
+    const bytes = Buffer.from('abcdef', 'hex');
+    const spy = vi.spyOn((await import('node:crypto')).default, 'randomBytes').mockReturnValue(bytes);
+    try {
+      const a = mk('default').tool({ claims: { sub: 'a' }, source: 'session', tool: 'book_fare', out });
+      const b = mk('second').tool({ claims: { sub: 'a' }, source: 'session', tool: 'book_fare', out });
+      expect(a).not.toBe(b); // same random bits, same counter: only the workspace tells them apart
+      expect(a).toMatch(/^run-default-/);
+    } finally { spy.mockRestore(); }
+    const readme = read('README.md');
+    expect(readme).not.toMatch(/image tails `audit\.log`/);
+    expect(readme).toMatch(/only `server\.log` and `init\.log` reach stdout/);
+    expect(readme).toMatch(/Run ids are unique per workspace by a counter, across workspaces by the workspace id, and across restarts by random bits/);
+  });
+
+  it('12. a 200 with an empty result is information, never "a usable reply"', async () => {
+    expect(replyOutcome({ response: { status: 200, body: { jsonrpc: '2.0', id: 1, result: {} } }, decisions: [{ outcome: 'pass' }, { outcome: 'pass' }] })).toBe('info');
+    expect(replyOutcome({ response: { status: 200, body: { jsonrpc: '2.0', id: 1, result: { tools: [] } } }, decisions: [{ outcome: 'pass' }, { outcome: 'pass' }] })).toBe('allowed');
+    door();
+    stubGateway((method, params, id) => ({ status: 200, body: { jsonrpc: '2.0', id, result: {} } }));
+    const { r } = await check(make());
+    const rec = r.body.observability;
+    clean(rec);
+    expect(gw(rec).map((x) => x.outcome)).toEqual(['info', 'info']);
+    expect(gw(rec)[0].message).toMatch(/empty result.*cannot read a grant/);
+    expect(gw(rec)[0].message).not.toMatch(/usable reply/);
   });
 });
 

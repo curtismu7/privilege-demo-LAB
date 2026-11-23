@@ -6,11 +6,14 @@ import { api } from "../api";
 import RunObservability from "../run-observability/RunObservability";
 
 const POLL_MS = 3000; // a held call keeps its run open: ask again until the approver's answer (or the expiry) closes it
-const TITLE = "What each layer logged for this run";
+const BACKOFF_MAX_MS = 30_000; // a failed read is tried again, each time after twice the wait, up to this
+// Two panels can sit on one page, so each has its own name (the heading and the region label).
+const TITLE_CALL = "What each layer logged for this tool call";
+const TITLE_CHECK = "What each layer logged for this gateway check";
 
 // Where this lab's own log lives and where it can stream (the README says the same).
 export const RUN_OBS_STREAMS = [
-  { product: "Privilege demo LAB (this lab)", lives: "the container's stdout: one line per decision (layer, step, actor, agent, tool, result, mode, run id; never a token or a password), and audit.jsonl in the data volume", streams: "nowhere today: the family log collector does not read this container. If it did, the SIEM time would be Docker's wall-clock time per line; the lab's own time stays inside the line" },
+  { product: "Privilege demo LAB (this lab)", lives: "the container's stdout: one line per decision (layer, step, actor, agent, act-source, tool, result, mode, cause, count, run id; never a token or a password), and audit.jsonl in the data volume", streams: "nowhere today: the family log collector does not read this container. If it did, the SIEM time would be Docker's wall-clock time per line; the lab's own time stays inside the line" },
   { product: "PingFederate (Live mode: sign-in and tokens)", lives: "its own container or host: server.log reaches stdout, audit.log does not", streams: "the collector ships PingFederate's stdout to ping-logs-pingfederate; audit.log is not shipped, and this lab reads none of it" },
   { product: "Privilege gateway (the Real gateway check)", lives: "cyonproxy.log in its log volume (local), or the SIEM index ping-siem-events-v2 and the console Activity Logs (hosted)", streams: "the collector's file source to ping-logs-privilege-gateway (local), or the Privilege SIEM export (hosted). This lab reads none of it, so the check shows only the replies it received" },
 ];
@@ -22,12 +25,14 @@ const LAB_NOTE = {
 };
 const GATEWAY_NOTE = "Every row under Agent gateway is a reply this lab received from the Privilege gateway, not a log line. Where the lab reads a status (for example 403 as a refusal) the row says it is the lab's reading. The lab reads no gateway log, so nothing here is marked logged. Time is when the lab received the reply.";
 
-const Note = ({ testId, role = "status", children }) => (
-  <section className="ro" data-testid={testId} aria-label={TITLE}>
-    <h2>{TITLE}</h2>
+const Note = ({ testId, role = "status", title = TITLE_CALL, children }) => (
+  <section className="ro" data-testid={testId} aria-label={title}>
+    <h2>{title}</h2>
     <p className="ro-muted" role={role}>{children}</p>
   </section>
 );
+// The lab's own line under a panel: set apart from the panel's "Where these logs live" disclosure, so it reads as a note and not as that disclosure's body.
+const LabNote = ({ children }) => <p className="ro-muted ro-lab-note" data-testid="ro-lab-note"><strong>Note.</strong> {children}</p>;
 
 // res: the console's last answer (null before a call). source: "mock" or "real", the page's current mode.
 export default function RunObs({ res, source }) {
@@ -38,17 +43,19 @@ export default function RunObs({ res, source }) {
     if (!key) return undefined;
     let live = true;
     let timer = null;
+    let fails = 0;
     const load = async () => {
       const answer = await api(`/api/run-observability?runId=${encodeURIComponent(runId)}`);
       if (!live) return;
       setGot({ key, answer });
-      if (answer.ok && answer.data?.run?.open) timer = setTimeout(load, POLL_MS);
+      // A failed read keeps the alert on screen and is tried again, each time after twice the wait; a working one is read again only while the run is open.
+      if (!answer.ok) { fails += 1; timer = setTimeout(load, Math.min(BACKOFF_MAX_MS, POLL_MS * 2 ** (fails - 1))); } else { fails = 0; if (answer.data?.run?.open) timer = setTimeout(load, POLL_MS); }
     };
     load();
     return () => { live = false; clearTimeout(timer); };
   }, [key]);
 
-  if (!res) return <><RunObservability record={null} source={source} streams={RUN_OBS_STREAMS} /><p className="ro-muted" data-testid="ro-lab-note">{LAB_NOTE[source]}</p></>;
+  if (!res) return <><RunObservability record={null} source={source} streams={RUN_OBS_STREAMS} title={TITLE_CALL} /><LabNote>{LAB_NOTE[source]}</LabNote></>;
   if (!runId) return <Note testId="ro-no-run">This attempt began no run, so there is no record for it.</Note>;
   const answer = got?.key === key ? got.answer : null;
   if (!answer) return <Note testId="ro-loading">Collecting this run's logs…</Note>;
@@ -57,18 +64,20 @@ export default function RunObs({ res, source }) {
   if (!d?.record) return <Note testId="ro-not-shown" role="alert">{d?.message || "There is no record for this run."}</Note>;
   return (
     <>
-      <RunObservability record={d.record} source={source} streams={RUN_OBS_STREAMS} />
-      <p className="ro-muted" data-testid="ro-lab-note">{LAB_NOTE[source]}</p>
+      <RunObservability record={d.record} source={source} streams={RUN_OBS_STREAMS} title={TITLE_CALL} />
+      <LabNote>{LAB_NOTE[source]}</LabNote>
     </>
   );
 }
 
 // The record of one gateway check, as the check's answer carried it (a record, or { error, message }). noReply: the calls that got no reply.
-export function GatewayRunObs({ record, noReply = [] }) {
+// loading: a retry is in flight, so the old record is not shown.
+export function GatewayRunObs({ record, noReply = [], loading = false }) {
+  if (loading) return <Note testId="ro-loading" title={TITLE_CHECK}>Collecting this run's logs…</Note>;
   return (
     <>
-      <RunObservability record={record} source="real" streams={RUN_OBS_STREAMS} />
-      <p className="ro-muted" data-testid="ro-lab-note">{GATEWAY_NOTE}</p>
+      <RunObservability record={record} source="real" streams={RUN_OBS_STREAMS} title={TITLE_CHECK} />
+      <LabNote>{GATEWAY_NOTE}</LabNote>
       {noReply.length > 0 && <p className="ro-muted" data-testid="ro-no-reply">No reply came back to {noReply.join("; ")}. A call with no reply has no row.</p>}
     </>
   );

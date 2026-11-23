@@ -186,3 +186,6 @@ button.danger { color: var(--danger-text); }
   max-height: 420px;
   overflow-y: auto;
 }
+
+/* Rule 27: the lab's own note under a run-observability panel, set apart from the panel's "Where these logs live" disclosure above it so it reads as a note. */
+p.ro-lab-note { margin: 18px 0 28px; padding: 10px 14px; border-left: 4px solid var(--border); background: var(--surface-2); max-width: 80ch; }

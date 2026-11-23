@@ -20,7 +20,7 @@ const OUT = {
 };
 async function made(kind, mode = "mock") {
   const log = createRunLog({ now: () => T, mode: () => mode });
-  const id = log.tool({ claims, source: "session", viaFlag: true, tool: "book_fare", out: OUT[kind] });
+  const id = log.tool({ claims, source: "session", persona: "mark", viaFlag: true, tool: "book_fare", out: OUT[kind] });
   const run = log.find(id, mode).run;
   return { id, run, record: await log.record(run) };
 }
@@ -201,5 +201,77 @@ describe("the gateway card's run record", () => {
     const m = await made("allow");
     render(<GatewayRunObs record={m.record} />);
     expect(screen.getByTestId("ro-mismatch")).toBeInTheDocument();
+  });
+});
+
+describe("review fixes: titles, the retry, the backoff", () => {
+  it("the two panels on one page have different names, and the lab's note reads as a note", async () => {
+    const m = await made("allow");
+    const log = createRunLog({ now: () => T });
+    const { record } = await log.gatewayCheck({ startedAt: T, caller: "travel_agent", replies: [] });
+    render(<><RunObs res={null} source="mock" /><GatewayRunObs record={record} /></>);
+    const names = screen.getAllByRole("region").map((r) => r.getAttribute("aria-label"));
+    expect(names).toEqual(["What each layer logged for this tool call", "What each layer logged for this gateway check"]);
+    for (const note of screen.getAllByTestId("ro-lab-note")) { expect(note).toHaveClass("ro-lab-note"); expect(note).toHaveTextContent(/^Note\./); }
+    expect(m.id).toBeTruthy();
+  });
+
+  it("the console's loading and alert states carry the console panel's name", async () => {
+    mockApi({ "GET /api/run-observability": reply(400, { error: "bad_x", message: "nope" }) });
+    render(<RunObs res={{ runId: "run-x-1" }} source="mock" />);
+    expect(await screen.findByRole("region", { name: "What each layer logged for this tool call" })).toBeInTheDocument();
+  });
+
+  it("a retry of the gateway check clears the old record while the new one is on its way, then shows the new one", async () => {
+    const log = createRunLog({ now: () => T });
+    const one = await log.gatewayCheck({ startedAt: T, caller: "first_agent", replies: [] });
+    const two = await log.gatewayCheck({ startedAt: T, caller: "second_agent", replies: [] });
+    let release;
+    const gate = new Promise((r) => { release = r; });
+    let posts = 0;
+    const base = { app: "travel-door", caller: "travel_agent", gateway: "https://gateway.example", listing: { ok: true, tools: [], ms: 1 } };
+    vi.stubGlobal("fetch", vi.fn(async (url, init = {}) => {
+      if (String(url) === "/api/info") return new Response(JSON.stringify({ source: "mock", realAvailable: true }), { status: 200 });
+      posts += 1;
+      if (posts === 2) await gate;
+      return new Response(JSON.stringify({ ...base, observability: posts === 1 ? one.record : two.record }), { status: 200 });
+    }));
+    renderAs(<GatewayCheckCard />);
+    await waitFor(() => expect(screen.getByTestId("run-observability")).toHaveAttribute("aria-label", expect.stringMatching(/gateway check/)));
+    const firstRun = one.record.runId;
+    expect(firstRun).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /run the gateway check/i }));
+    expect(screen.queryByTestId("run-observability")).toBeNull(); // not the old record while the new check is in flight
+    expect(screen.getByTestId("ro-loading")).toHaveTextContent("Collecting this run's logs…");
+    release();
+    await waitFor(() => expect(screen.getByTestId("run-observability")).toBeInTheDocument());
+    expect(screen.queryByTestId("ro-loading")).toBeNull();
+  });
+
+  it("a failed poll does not stop the polling: the alert stays, the next try comes later each time, and the record appears when one works", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const m = await made("allow");
+    let n = 0;
+    const calls = [];
+    vi.stubGlobal("fetch", vi.fn(async (url) => {
+      calls.push(String(url));
+      n += 1;
+      if (n < 3) throw new TypeError("offline");
+      return new Response(JSON.stringify(answerOf(m)), { status: 200 });
+    }));
+    render(<RunObs res={{ runId: m.id }} source="mock" />);
+    expect(await screen.findByTestId("ro-error")).toBeInTheDocument();
+    expect(calls).toHaveLength(1);
+    await act(async () => { await vi.advanceTimersByTimeAsync(3100); }); // first retry after 3 s
+    expect(calls).toHaveLength(2);
+    expect(screen.getByTestId("ro-error")).toBeInTheDocument(); // the alert stays while it keeps failing
+    await act(async () => { await vi.advanceTimersByTimeAsync(3100); }); // the next wait is longer: 6 s
+    expect(calls).toHaveLength(2);
+    await act(async () => { await vi.advanceTimersByTimeAsync(3100); });
+    expect(calls).toHaveLength(3);
+    expect(await screen.findByTestId("ro-table")).toBeInTheDocument();
+    expect(screen.queryByTestId("ro-error")).toBeNull();
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+    expect(calls).toHaveLength(3); // a closed run is not asked for again
   });
 });
