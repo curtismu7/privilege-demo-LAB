@@ -116,13 +116,38 @@ Every tool call, held call and "Test a request" answer comes with a plain-Englis
 - **API**: `explanation` on `POST /api/tools/call` (also `?envelope=1`), approvals (`explanation`, `outcome.explanation`), `GET /api/trace` (`explanations`, keyed by span id), `POST /api/decide-test` with `"explain": true`; `meaning` on `GET /api/policies` rows; `POST /api/policies/explain {id, text}`. `/mcp` errors keep exactly `decision, reason, rule, rules`; read the explanation through the Trace API using the returned `traceparent`.
 - The explanation is checked against Cedar's own answer. If the two ever disagree it drops its per-rule reasons and says "Per-rule detail could not be checked for this request"; it never changes a decision.
 
+## Run observability (rule 27)
+
+Under the Tool console result, and under the Privilege gateway card, the shared panel "What each layer logged for this run" shows one run in time order across six layers: Person, Agent, Authorize, Privilege, Agent gateway and Resource server. It is an excerpt: ids, tokens and addresses are masked. A run is one tool call, from its sign-in check to its final verdict. A held call keeps its run open until the approver answers or the request expires (the console re-reads it every few seconds meanwhile); the newest 20 finished runs of a workspace are kept, and an open run is never evicted. `GET /api/run-observability[?runId=]` answers for signed-in people (per workspace, `X-Workspace`); a run comes back only in the mode it was made in, so a Mock run never appears as a Live record. Who may read a held run follows `/api/approvals`: the person who asked, a named approver, an approver who answered and an admin read it whole; anyone else who asks for it by run id gets the same rows (layers, outcomes, times) with the people left out ("another person", "an agent", "an approver"). Without a run id the newest run is the newest one the viewer took part in (an admin gets the newest of all), so nobody is handed another person's run by default. A run that was never held is as open as `/api/trace`, which names the subject to everyone signed in. The files are vendored byte for byte from AI-DEMO-Standalone `shared/run-observability` (pinned by `web/src/run-observability/run-observability.sha256`; never edit them).
+
+| What ran | What the panel shows |
+| --- | --- |
+| Mock tool call | Rows tagged `simulated`: the lab's mock computed each one. Person (the persona picker, the mock Bearer check or a live sign-in cookie: information, because checking who the call is for is authentication, not a policy decision), Agent (the `act` claim, or the console's agent box), Privilege (this lab's own Cedar PEP), Resource server (the mock tool ran). **Authorize** is not logged: this lab does not call PingOne Authorize, its policy engine is Cedar inside the lab. **Agent gateway** is not logged: there is no separate gateway, the lab's own PEP (shown under Privilege) takes its place. The Privilege lane holds that lab-owned PEP, a Privilege-style simulation, not Privilege itself, and the page says so under the panel. |
+| Live tool call | A real record with every layer `not logged` and the reason. The lab verifies the token itself against your PingFederate and decides with its own Cedar PEP: neither is a log line or a reply from a product, so no row claims to be one. `act` and `groups` in a real PingFederate token are UNVERIFIED and are not shown as facts. The decision is on the Tool console result and the Trace page. |
+| Privilege gateway check (Real) | One `response` row per reply the lab received from the door: 401 and 403 are refused, a usable 200 is allowed, a 200 carrying a JSON-RPC error or `isError` is refused, an unparsed body or any other status is information. Where the lab reads a status (403 as "the grant refused it") the row says it is the lab's reading (the shared "inferred" mark), never the gateway's words. A call that got no reply has no row: the panel says why. The record comes back with the check's own answer (no second gateway call). |
+
+What counts as a decision: only a policy point's. A Cedar allow is `allowed`; a Cedar deny, an unknown tool and bad arguments are `refused`; a hold is information until an approver answers (the approver's answer is the decision: `allowed` or `refused`); the lab's own stops, the engine failing closed and the approval timeout, are `blocked`. A sign-in or credential check, the agent reading and the mock tool run are information, never counted as passed.
+
+**Where this lab's run leaves logs.** The container's stdout gets one line per decision the lab makes (a collector would ship it): `<iso> privilege-demo-lab decision layer=<layer> step=<step> actor=<who> agent=<agent|-> act-source=<lab|credential|-> tool=<tool|-> result=<passed|stopped|unclear|no-reply> mode=<mock|live|real> cause=<code|-> count=<n> run=<id|->`. `act-source` says who added the agent: `lab` (the console's agent box) or `credential` (the credential or session carried `act`). `cause` is a fixed code for a refused sign-in (`no-credential`, `not-configured`, `out-of-time`, `not-for-us`, `unreadable`, `bad-signature`, `missing-claims`, `pf-unreachable`, `inactive`, `other`), and a burst of one cause inside ten seconds is one line (`count=1`) followed by one line with the number that were not written. Values are sanitised and masked, and the line carries no token or password. Run ids are unique per workspace by a counter, across workspaces by the workspace id, and across restarts by random bits (probabilistic). `audit.jsonl` in the data volume (one folder per workspace) has the lab's older audit row for each call and approval. Time on a row and on its line is when the lab recorded the decision: a held call's answer when the approver answers, an expiry when the lab next looks at the queue, a gateway reply when it came back.
+
+**Where the logs can stream (a SIEM).**
+
+| Product | Lives in | Streams to |
+| --- | --- | --- |
+| This lab | the container's stdout and `audit.jsonl` | nowhere today: the family log collector's source list does not include this container. If it did, the SIEM `@timestamp` would be Docker's wall-clock time per line |
+| PingFederate | container stdout: only `server.log` and `init.log` reach stdout today (the collector handles `audit.log`, but nothing sends it there) | the collector to `ping-logs-pingfederate`, then a SIEM; `audit.log` is not shipped |
+| Privilege agent gateway (local) | `cyonproxy.log` in its log volume | the collector's file source to `ping-logs-privilege-gateway` |
+| Privilege hosted gateway and console | the SIEM index `ping-siem-events-v2`, the console Activity Logs | the Privilege SIEM export |
+
+**Not logged today.** PingOne Authorize has no container log (and this lab does not call it); PingFederate `audit.log` is not shipped; the line shape of a gateway refusal or block is unconfirmed in any gateway log; the PingOne audit reader does not exist. This lab reads no log of any product, so nothing in the panel is ever tagged `logged`. There is no reader setting: no `RUN_OBS_*` variable exists here, and the compose file mounts no Docker socket.
+
 ## Tests
 
 ```sh
 npm test      # server (vitest: Cedar behind a no-network guard, then the app), then web (vitest, jsdom)
 ```
 
-On Node 26: server 527 passed, 0 failed (30 files); web 162 passed, 0 failed (14 files). `npm run doctor` is all ok.
+On Node 26: server 639 passed, 0 failed (36 files); web 338 passed, 0 failed (30 files). `npm run doctor` is all ok.
 Browser stories: `npm run build && npm run e2e` (S04, S01, S23, S05, and a check that the browser console has no errors) and `npm run e2e:utility` (the utility pack, light and dark at desktop and 375 px) drive the real UI in Chromium (`npx playwright install chromium`); `npm run check:diagrams` runs the family's label-overlap detector on every diagram at three widths. They are not part of `npm test`.
 
 ## Troubleshooting

@@ -14,7 +14,7 @@ if (problems.length) {
   for (const p of problems) console.error(`[privilege-demo] refusing to start: ${p}`);
   process.exit(1);
 }
-const app = createApp({ cfg });
+const app = createApp({ cfg, log: (line) => console.log(line) }); // one stdout line per decision the lab makes (runLog.js)
 for (const warning of app.locals.customerWarnings || []) console.warn(`[privilege-demo] customer.config: ${warning}`);
 
 // The netguard's self-test: a real URL must be refused before the app answers anything (nothing leaves the machine in mock mode).
