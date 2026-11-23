@@ -66,8 +66,14 @@ describe('the pin and the lab\'s safety', () => {
     expect(core).not.toMatch(/^\s*import\s/m);
     expect(core).not.toMatch(/ElasticsearchReader|DockerLogReader|readersFromEnv|\bfetch\s*\(|node:http|node:fs/);
     const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(path.join(dir, e.name)) : [path.join(dir, e.name)]));
-    for (const f of walk(path.join(root, 'server/src')).filter((x) => /\.(js|mjs)$/.test(x) && !x.endsWith('runObservability.js'))) {
+    const corePath = path.join(root, 'server/src/runObservability.js');
+    for (const f of walk(path.join(root, 'server/src')).filter((x) => /\.(js|mjs)$/.test(x) && x !== corePath)) {
       expect(fs.readFileSync(f, 'utf8'), path.relative(root, f)).not.toMatch(/ElasticsearchReader|DockerLogReader|readersFromEnv|RUN_OBS_/);
+    }
+    // The page code outside the vendored folder carries no RUN_OBS_ name either (a JS constant with that prefix reads like a setting).
+    const vendored = path.join(root, 'web/src/run-observability');
+    for (const f of walk(path.join(root, 'web/src')).filter((x) => /\.(jsx?|mjs)$/.test(x) && !x.startsWith(vendored + path.sep))) {
+      expect(fs.readFileSync(f, 'utf8'), path.relative(root, f)).not.toMatch(/RUN_OBS_/);
     }
   });
 
