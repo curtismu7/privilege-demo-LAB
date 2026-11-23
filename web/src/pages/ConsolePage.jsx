@@ -13,6 +13,7 @@ import MockToken from "../components/MockToken";
 import RequireSignIn from "../components/RequireSignIn";
 import ResultCard from "../components/ResultCard";
 import GatewayTrace from "../gateway-trace/GatewayTrace";
+import RunObs from "../components/RunObs";
 import { PageStories } from "../story/StoryPanel";
 
 const titleCase = (s) => String(s).split(/[-_\s]+/).filter(Boolean).map((w) => w[0].toUpperCase() + w.slice(1)).join(" ");
@@ -107,6 +108,7 @@ function Console() {
           <p role="status" className="muted">{note}</p>
         </section>
       </div>
+      <RunObs res={res} source={config?.mode === "live" ? "real" : "mock"} />
       <MockToken />
       <Glossary />
     </main>

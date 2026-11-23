@@ -1,6 +1,7 @@
 // Pattern from id-jag-standalone server/src/app.js: createApp() for tests, serves web/dist.
 // createApp({ cfg, now, fetchImpl, customerFile }) : cfg defaults to config(); now() is the injectable clock (approval expiry, sessions, trace);
 // fetchImpl is the real fetch behind the netguard (tests pass a stub that must never be called in mock mode).
+// log(line) receives one stdout line per decision the lab makes (runLog.js); the default drops them, index.js prints them.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -28,10 +29,13 @@ import { createPreflight } from './preflight.js';
 import { createTracer } from './trace/hops.js';
 import { createSink, parseTraceparent, newTraceparent } from './trace/index.js';
 import { createExplainer, createExplanationStore } from './explain/index.js';
+import { createRunLog } from './runLog.js';
+import { RunObsError } from './runObservability.js';
 import { shelfInfo } from './shelfLink.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const WEB_DIST = process.env.WEB_DIST || path.join(ROOT, 'web/dist');
+const MODE_NAME = { mock: 'Mock', live: 'Live' };
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 const CSP = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
 
@@ -41,7 +45,7 @@ export const DEMO = (() => {
   return { id: 'privilege-demo', name: 'Privilege demo LAB', version };
 })();
 
-export function createApp({ cfg = config(), now = () => Date.now(), fetchImpl = globalThis.fetch, customerFile } = {}) {
+export function createApp({ cfg = config(), now = () => Date.now(), fetchImpl = globalThis.fetch, customerFile, log = () => {} } = {}) {
   init();
   const app = express();
   app.disable('x-powered-by');
@@ -94,9 +98,11 @@ export function createApp({ cfg = config(), now = () => Date.now(), fetchImpl = 
       const backend = createBackend({ tools: pack.tools });
       const explanations = createExplanationStore({ size: 500 });
       const store = createPolicyStore({ dataDir: dir, pack });
+      const runs = createRunLog({ now, write: log, mode });
       const approvals = createApprovals({
         now, ttlMs: cfg.approvalTtlMs,
         onExpire(r) {
+          runs.expired({ record: r });
           const tp = tracer.emit(r.traceparent, { hop: 'approval', subject: r.claims.sub, ...(pack.attribution ? { actor: r.claims.act?.sub ? { sub: r.claims.act.sub } : null, tool: r.tool } : {}), decision: { result: 'deny', rule: 'approval-expired', reason: 'expired without an answer' } }).traceparent;
           r.traceparent = tp;
           try {
@@ -108,12 +114,12 @@ export function createApp({ cfg = config(), now = () => Date.now(), fetchImpl = 
         },
       });
       const pep = createPep({ backend, store, approvals, tracer, audit, now, attribution: pack.attribution, explainer, explanations });
-      return { id, dir, sink, tracer, audit, backend, store, approvals, pep, explanations };
+      return { id, dir, sink, tracer, audit, backend, store, approvals, pep, explanations, runs };
     },
     // Run state of one workspace: policies back to the shipped set, no approvals, no drift, an empty trace. Sign-ins and settings stay.
     reset(ws) {
       const cleared = { approvals: ws.approvals.list().length, traceEvents: ws.sink.list().length, driftedTools: ws.backend.driftedTools().length };
-      ws.store.reset(); ws.approvals.clear(); ws.backend.resetDrift(); ws.sink.clear(); ws.explanations.clear();
+      ws.store.reset(); ws.approvals.clear(); ws.backend.resetDrift(); ws.sink.clear(); ws.explanations.clear(); ws.runs.reset();
       ws.audit.write({ kind: 'reset' });
       return { workspace: ws.id, cleared };
     },
@@ -204,7 +210,10 @@ export function createApp({ cfg = config(), now = () => Date.now(), fetchImpl = 
     ...(a.reason === 'bearer_not_enabled' ? { fix: 'This server has no PingFederate configured: set PF_URL and PF_AUDIENCE in ~/Development/.env and restart (GET /api/preflight lists what is missing).' } : {}) });
   const authed = (opts, handler) => wrap(async (req, res) => {
     const a = await authenticate(req, opts);
-    if (!a.ok) return res.status(401).set('www-authenticate', 'Bearer').json(unauthorized(a));
+    if (!a.ok) {
+      if (opts.run) wsOf(req).runs.refusedSignIn({ reason: a.reason });
+      return res.status(401).set('www-authenticate', 'Bearer').json(unauthorized(a));
+    }
     req.principal = a;
     return handler(req, res);
   });
@@ -245,16 +254,26 @@ export function createApp({ cfg = config(), now = () => Date.now(), fetchImpl = 
     const app = String(req.body?.app || gatewayDoor.apps[0]);
     if (!gatewayDoor.apps.includes(app)) return res.status(400).json({ error: 'bad_app', fix: `app must be one of ${gatewayDoor.apps.join(', ')}` });
     const caller = req.body?.caller && gatewayDoor.callers.some((c) => c.id === req.body.caller) ? req.body.caller : gatewayDoor.callers[0].id;
+    const startedAt = now();
     const listing = await gatewayDoor.list(app, caller);
+    const listedAt = now(); // when the lab had this reply (stamped once)
     const out = { app, caller, gateway: gatewayDoor.origin, ...(gatewayDoor.version ? { version: gatewayDoor.version } : {}), listing: stripWire(listing) };
     // An aggregate door only accepts <server>__<tool> names, and answers an un-namespaced one with a name-format error that is not a
     // policy refusal. So borrow the server prefix of a tool the door itself listed; a plain door keeps the bare name.
     const listedNs = (listing.tools || []).map((t) => String(t?.name || '')).find((n) => /^[^_].*?__./.test(n));
     const probeName = `${listedNs ? `${listedNs.slice(0, listedNs.indexOf('__'))}__` : ''}privilege_demo_refusal_probe_tool`;
     const refusal = listing.ok ? await gatewayDoor.call(app, caller, probeName, {}) : undefined;
+    const probedAt = now();
     if (refusal) out.refusal = stripWire(refusal);
     // "What Privilege did" (Rule 25): the exact exchanges, from the hop's redacted wire capture.
     out.exchanges = gatewayCheckExchanges(listing, refusal);
+    // Rule 27: the replies the lab received, as response rows (a call with no reply has no row). The record goes back with the answer.
+    const seen = await wsOf(req).runs.gatewayCheck({ startedAt, caller, replies: [
+      { at: listedAt, asked: 'tools/list', trace: out.exchanges[0].trace },
+      ...(refusal ? [{ at: probedAt, asked: 'tools/call', control: true, trace: out.exchanges[1].trace }] : []),
+    ] });
+    out.observability = seen.record;
+    if (seen.noReply.length) out.noReply = seen.noReply;
     res.json(out);
   }));
   app.get('/api/auth/config', (req, res) => res.json({
@@ -342,17 +361,20 @@ export function createApp({ cfg = config(), now = () => Date.now(), fetchImpl = 
   const STATUS = { allow: 200, hold: 202, deny: 403 };
   const publicOutcome = (o) => { const { traceparent, ...rest } = o; return rest; };
 
-  app.post('/api/tools/call', authed({ trace: true }, (req, res) => {
+  app.post('/api/tools/call', authed({ trace: true, run: true }, (req, res) => {
     const { tool, args, asAgent, justification } = req.body ?? {};
     // asAgent: Mark's personal agent (Dot) makes the call, so the token carries act and the call is unattended.
     const claims = asAgent === true ? { ...req.principal.claims, act: { sub: AGENT.sub } } : req.principal.claims;
-    const out = wsOf(req).pep.enforce({ claims, tool, args: args ?? {}, source: req.principal.source, traceparent: req.principal.traceparent, justification });
+    const ws = wsOf(req);
+    const out = ws.pep.enforce({ claims, tool, args: args ?? {}, source: req.principal.source, traceparent: req.principal.traceparent, justification });
+    // Rule 27: the run of this call (its decisions are stamped, written and stored once). A recorder that fails never changes the answer.
+    const runId = ws.runs.tool({ claims, source: req.principal.source, viaFlag: asAgent === true, tool, out });
     res.set('traceparent', out.traceparent);
     // ?envelope=1 (the web console): always 200 with the outcome in the body, because a Deny is a result and not a failed request.
     // The console also gets "What Privilege did" (Rule 25): this exchange as the simulated gateway handled it, beside the outcome it shows.
     if (req.query.envelope === '1') {
-      const shown = publicOutcome(out);
-      const exchanges = [{ step: 1, title: `Tool call: ${typeof tool === 'string' ? tool.slice(0, 80) : 'no tool named'}`, status: 200, trace: pepTrace({ body: req.body ?? null, out, sub: req.principal.claims.sub, workspace: req.workspaceId }) }];
+      const shown = { ...publicOutcome(out), ...(runId ? { runId } : {}) };
+      const exchanges = [{ step: 1, title: `Tool call: ${typeof tool === 'string' ? tool.slice(0, 80) : 'no tool named'}`, status: 200, trace: pepTrace({ body: req.body ?? null, out: { ...out, ...(runId ? { runId } : {}) }, sub: req.principal.claims.sub, workspace: req.workspaceId }) }];
       return res.status(200).json({ ...shown, exchanges });
     }
     return res.status(STATUS[out.outcome]).json(publicOutcome(out));
@@ -360,8 +382,11 @@ export function createApp({ cfg = config(), now = () => Date.now(), fetchImpl = 
 
   app.post('/mcp', wrap(async (req, res) => {
     const a = await authenticate(req, { trace: true, bearerOnly: true }); // MCP is Bearer only
-    if (!a.ok) return res.status(401).set('www-authenticate', 'Bearer').json(unauthorized(a));
-    const { backend, pep } = wsOf(req);
+    if (!a.ok) {
+      if (req.body?.method === 'tools/call') wsOf(req).runs.refusedSignIn({ reason: a.reason });
+      return res.status(401).set('www-authenticate', 'Bearer').json(unauthorized(a));
+    }
+    const { backend, pep, runs } = wsOf(req);
     const msg = req.body;
     if (!msg || typeof msg !== 'object' || Array.isArray(msg) || msg.jsonrpc !== '2.0') return res.status(400).json({ jsonrpc: '2.0', id: null, error: { code: -32600, message: 'Invalid Request' } });
     if (msg.id === undefined) return res.status(202).end();
@@ -370,6 +395,7 @@ export function createApp({ cfg = config(), now = () => Date.now(), fetchImpl = 
     if (handled) return reply(handled);
     const params = msg.params ?? {};
     const out = pep.enforce({ claims: a.claims, tool: params.name, args: params.arguments ?? {}, source: 'mcp', traceparent: a.traceparent });
+    runs.tool({ claims: a.claims, source: a.source, tool: params.name, out });
     res.set('traceparent', out.traceparent);
     if (out.outcome === 'allow') return res.json({ jsonrpc: '2.0', id: msg.id, result: { content: [{ type: 'text', text: JSON.stringify(out.result) }] } });
     const code = out.outcome === 'hold' ? -32004 : -32003;
@@ -392,12 +418,13 @@ export function createApp({ cfg = config(), now = () => Date.now(), fetchImpl = 
   }));
   for (const verb of ['approve', 'deny']) {
     app.post(`/api/approvals/:id/${verb}`, authed({ trace: true }, (req, res) => {
-      const { approvals, pep } = wsOf(req);
+      const { approvals, pep, runs } = wsOf(req);
       const r = approvals.get(req.params.id);
       if (!r || !mine(req.principal.claims, r)) return res.status(404).json({ error: 'not_found' });
       if (!mayDecide(req.principal.claims, r)) return res.status(403).json({ error: 'not_an_approver' });
       if (r.status !== 'pending') return res.status(409).json({ error: r.status === 'expired' ? 'expired' : 'already_decided', status: r.status });
       pep.resolve(r, { sub: req.principal.claims.sub }, verb === 'approve');
+      runs.approval({ approver: req.principal.claims.sub, record: r });
       return res.json(approvals.view(r));
     }));
   }
@@ -513,6 +540,28 @@ export function createApp({ cfg = config(), now = () => Date.now(), fetchImpl = 
       if (x && seen) explanations[e.span_id] = x;
     }
     res.json({ events, explanations });
+  }));
+
+  // Rule 27: what each layer logged for one tool-call run. ?runId= asks for that run (the console's own); without it, the newest run in the
+  // current mode. A run made in the other mode is never returned (a Mock run must not come back as a Live record, nor the reverse).
+  // Same audience as /api/trace: anyone signed in to this workspace.
+  app.get('/api/run-observability', authed({}, async (req, res) => {
+    const { runs, approvals } = wsOf(req);
+    const wanted = typeof req.query.runId === 'string' ? req.query.runId.slice(0, 80) : undefined;
+    const found = runs.find(wanted, mode());
+    if (!found.run) {
+      const message = found.none === 'other-mode' ? `That run was made in ${MODE_NAME[found.runMode]} mode. Switch back to ${MODE_NAME[found.runMode]} to see it.`
+        : found.none === 'unknown' ? 'That run is no longer kept: a workspace keeps its newest runs, and Reset clears them.'
+          : 'No run has been made in this mode in this workspace yet.';
+      return res.json({ record: null, message, reason: found.none });
+    }
+    try {
+      if (found.run.open) approvals.list(); // the queue expires lazily: look at it, so a request past its time is closed before its record is read
+      return res.json({ record: await runs.record(found.run), run: { id: found.run.id, open: found.run.open, mode: found.run.mode } });
+    } catch (e) {
+      console.error(`[privilege-demo] run record failed (${e?.code || e?.name || 'error'})`);
+      return res.status(e instanceof RunObsError ? e.status : 500).json({ error: e?.code || 'run_record_failed', message: e instanceof RunObsError ? e.message : 'The run record could not be built.' });
+    }
   }));
 
   // The header "Shelf" button. Before the /api 404 below, and not tied to a web build.
