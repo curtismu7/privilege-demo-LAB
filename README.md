@@ -223,9 +223,9 @@ file (`~/Development/.env`, or the file `STANDALONE_ENV` names).
 | Object | Value |
 |---|---|
 | Gateway | `mcpgw.ai-demo.ping-devops.com` (cluster `ai-demo-cmuir`) |
-| Door (Agentic App) | `aggregate-limited` — client path `/aggregate-limited/mcp` |
+| Door (Agentic App) | `lab-agg-limited` — client path `/lab-agg-limited/mcp` |
 | Caller | agent access key `PDG_GW_KEY_LAB_AGENT` (write-only, never shown) |
-| Backend | `aggregate` = the gateway's MCP aggregate over `opensearch` (9 tools) + `banking-mcp` (33 tools); `aggregate-limited` = the same members with a tool filter |
+| Backend | `lab-agg-full` = the gateway's MCP aggregate over `opensearch` (9 tools) + `banking-mcp` (33 tools); `lab-agg-limited` = the same members with a tool filter |
 
 **What runs in Real:** the **Privilege gateway check** (`POST /api/gateway-check`, card on the
 page) — one live `tools/list` through the door with the key, then one `tools/call` probe of a
