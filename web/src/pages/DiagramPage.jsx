@@ -18,7 +18,7 @@ export default function DiagramPage() {
       <h1>Diagram</h1>
       <p className="lede">Drag the boxes to rearrange them, or focus a box and use the arrow keys. Simulate walks the steps; Reset puts everything back. A box that took part in your latest traced call shows that call under Sent / Received.</p>
       <div className="row">
-        <button type="button" className="primary" onClick={load}>Refresh from the latest trace</button>
+        <button type="button" onClick={load}>Refresh from the latest trace</button>
       </div>
       <div className="story__paths" role="group" aria-label="Diagram">
         {DIAGRAM_IDS.map((d) => <button key={d} type="button" aria-pressed={d === id} onClick={() => setId(d)}>{loadDiagram(d).title}</button>)}
