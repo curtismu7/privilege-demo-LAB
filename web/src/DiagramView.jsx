@@ -5,7 +5,9 @@ import "./DiagramView.css";
 import { ArrowNoLabel, EdgeLabels, FitOpen, Passport, PassportActions } from "./diagram-kit/DiagramKit.jsx";
 import { boxPassport, inOutPoint } from "./diagram-kit/diagramKit.js";
 import "./diagram-kit/diagram-kit.css";
+import Json from "./components/JsonPane";
 import { loadDiagram, withPackWording } from "./diagrams/index.js";
+import { hopsToCalls, withHops } from "./hopsToCalls.js";
 import { useStepper, SPEEDS } from "./stepper.js";
 
 // Renders diagram-studio/1 data: a named diagram (`id`). Boxes are movable; Reset puts every box back and stops the walkthrough;
@@ -39,7 +41,7 @@ function BoxNode({ data }) {
       {data.sub.map((line, i) => <span key={`${i}-${line}`}>{line}</span>)}
       <Handle type="source" position={Position.Right} id="out" />
       <Handle type="target" position={Position.Right} id="back-in" className="handle-back" isConnectable={false} />
-      {data.passport && <Passport p={data.passport} />}
+      {data.passport && <Passport p={data.passport} JsonView={Json} />}
     </div>
   );
 }
@@ -102,8 +104,11 @@ export function toLabelItems(diagram, edges, active) {
 // Labels sit where the arrow meets the box: mid height on out/in, 70% down on the back pair (the kit's inOutPoint).
 export const labelPointFor = (box, handle) => inOutPoint(box, String(handle));
 
-export default function DiagramView({ id, wording = null, heading = "h3" }) {
-  const diagram = useMemo(() => withPackWording(loadDiagram(id), wording), [id, wording]);
+export default function DiagramView({ id, wording = null, heading = "h3", traceEvents = null }) {
+  const diagram = useMemo(() => {
+    const base = withPackWording(loadDiagram(id), wording);
+    return traceEvents?.length ? withHops(base, hopsToCalls(traceEvents, base.edges)) : base;
+  }, [id, wording, traceEvents]);
   const { positions, move, reset } = usePositions(diagram);
   const [s, dispatch] = useStepper(diagram.steps?.length ?? 0);
   useEffect(() => { dispatch({ type: "total", total: diagram.steps?.length ?? 0 }); }, [diagram, dispatch]);
@@ -117,7 +122,7 @@ export default function DiagramView({ id, wording = null, heading = "h3" }) {
   const [open, setOpen] = useState(null);
   const graph = useMemo(() => ({
     nodes: diagram.nodes.map((n) => ({ id: n.id, label: n.label, sub: n.sub ?? [], group: n.group })),
-    edges: diagram.edges.map((e) => ({ source: e.source, target: e.target, label: e.label ?? "" })),
+    edges: diagram.edges.map((e, i) => ({ id: `e${i}`, source: e.source, target: e.target, label: e.label ?? "", hop: e.hop ?? null })),
     groups: diagram.groups,
   }), [diagram]);
   const passportFor = useMemo(() => (nid) => boxPassport(graph, nid), [graph]);
