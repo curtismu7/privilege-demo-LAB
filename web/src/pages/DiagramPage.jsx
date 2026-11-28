@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import DiagramView from "../DiagramView";
 import { DIAGRAM_IDS, loadDiagram } from "../diagrams";
 import { usePack } from "../pack";
+import { useSession } from "../session";
 import { api } from "../api";
 
 // How a tool call travels, how a hold is approved, and what a rug pull looks like. Each diagram is diagram-studio/1 data, loaded by name.
@@ -9,8 +10,9 @@ export default function DiagramPage() {
   const [id, setId] = useState(DIAGRAM_IDS[0]);
   const [events, setEvents] = useState(null);
   const pack = usePack();
+  const { status } = useSession();
   const load = useCallback(async () => { const r = await api("/api/trace"); if (r.ok) setEvents(r.data.events); }, []);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { if (status === "in") load(); }, [load, status]);
   return (
     <main className="page">
       <h1>Diagram</h1>
